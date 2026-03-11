@@ -1,7 +1,50 @@
+"use client";
+
 import Link from "next/link";
 import { GraduationCap, ArrowRight, BookOpen, Calendar, ArrowLeft } from "lucide-react";
+import { useState } from "react";
+import { api } from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+    const router = useRouter();
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        setIsLoading(true);
+
+        try {
+            const data = await api.login(email, password);
+
+            if (data.accessToken) {
+                localStorage.setItem("token", data.accessToken);
+                localStorage.setItem("role", data.role);
+
+                // Redirection vers le dashboard global peu importe le rôle pour l'instant
+                router.push("/dashboard");
+
+                /* Note pour plus tard : Si vous souhaitez séparer par rôles :
+                if (data.role === "ROLE_ADMIN") router.push("/admin/dashboard");
+                else if (data.role === "ROLE_ENSEIGNANT") router.push("/enseignant/dashboard");
+                else if (data.role === "ROLE_ETUDIANT") router.push("/etudiant/dashboard");
+                else router.push("/dashboard"); // Fallback
+                */
+            } else {
+                setError("Réponse de connexion invalide.");
+            }
+        } catch (err: any) {
+            setError(err.message || "Erreur lors de la connexion. Veuillez vérifier vos identifiants.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen font-sans bg-[#f0f1f3] text-[#333333] flex flex-col md:flex-row">
             {/* Left Branding/Info Panel */}
@@ -73,12 +116,20 @@ export default function LoginPage() {
                         <p className="text-gray-600">Entrez vos identifiants pour accéder à votre portail</p>
                     </div>
 
-                    <form className="flex flex-col gap-6">
+                    {error && (
+                        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md text-sm font-medium">
+                            {error}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleLogin} className="flex flex-col gap-6">
                         <div className="space-y-2">
                             <label className="text-sm font-bold text-[#333333]" htmlFor="email">Adresse e-mail</label>
                             <input
                                 id="email"
                                 type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                                 className="w-full bg-[#f0f1f3] border-none rounded px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#ffa000] transition-shadow text-[#333333] placeholder:text-gray-400"
                                 placeholder="votre.nom@institut.edu"
                                 required
@@ -92,7 +143,9 @@ export default function LoginPage() {
                             </div>
                             <input
                                 id="password"
-                                type="password"
+                                type={showPassword ? "text" : "password"}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
                                 className="w-full bg-[#f0f1f3] border-none rounded px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#ffa000] transition-shadow text-[#333333] placeholder:text-gray-400"
                                 placeholder="••••••••"
                                 required
@@ -100,13 +153,23 @@ export default function LoginPage() {
                         </div>
 
                         <div className="flex items-center gap-3 mb-2">
-                            <input type="checkbox" id="remember" className="rounded text-[#ffa000] focus:ring-[#ffa000] h-5 w-5 bg-[#f0f1f3] border-none cursor-pointer" />
-                            <label htmlFor="remember" className="text-sm text-gray-600 cursor-pointer font-medium">Se souvenir de moi</label>
+                            <input
+                                type="checkbox"
+                                id="show-password"
+                                checked={showPassword}
+                                onChange={(e) => setShowPassword(e.target.checked)}
+                                className="rounded text-[#ffa000] focus:ring-[#ffa000] h-5 w-5 bg-[#f0f1f3] border-none cursor-pointer"
+                            />
+                            <label htmlFor="show-password" className="text-sm text-gray-600 cursor-pointer font-medium">Afficher le mot de passe</label>
                         </div>
 
-                        <button type="submit" className="w-full bg-[#ffa000] text-white font-bold py-4 rounded hover:bg-[#ff8f00] transition-colors shadow-md flex items-center justify-center gap-2 text-lg">
-                            Connexion à l&apos;espace
-                            <ArrowRight size={18} />
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className={`w-full text-white font-bold py-4 rounded transition-colors shadow-md flex items-center justify-center gap-2 text-lg ${isLoading ? 'bg-[#ffc166] cursor-not-allowed' : 'bg-[#ffa000] hover:bg-[#ff8f00]'}`}
+                        >
+                            {isLoading ? "Connexion en cours..." : "Connexion à l'espace"}
+                            {!isLoading && <ArrowRight size={18} />}
                         </button>
                     </form>
 
