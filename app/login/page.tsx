@@ -23,8 +23,8 @@ export default function LoginPage() {
             const data = await api.login(email, password);
 
             if (data.accessToken) {
-                localStorage.setItem("token", data.accessToken);
-                localStorage.setItem("role", data.role);
+                sessionStorage.setItem("token", data.accessToken);
+                sessionStorage.setItem("role", data.role);
 
                 // Redirection vers le dashboard global peu importe le rôle pour l'instant
                 router.push("/dashboard");

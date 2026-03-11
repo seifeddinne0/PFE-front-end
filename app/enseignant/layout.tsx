@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { LogOut, User, BookOpen, Settings, Bell, LayoutDashboard, FileText, Users, Calendar } from "lucide-react";
+import { LogOut, FileText, Settings, Bell, LayoutDashboard, BookOpen } from "lucide-react";
 import Link from "next/link";
 import { Toaster } from 'react-hot-toast';
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function EnseignantLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
     const [isLoading, setIsLoading] = useState(true);
-    const [userEmail, setUserEmail] = useState<string>("admin@institut.edu"); // Default or fetched
+    const [userEmail, setUserEmail] = useState<string>("enseignant@institut.edu");
 
     useEffect(() => {
         const token = sessionStorage.getItem("token");
@@ -18,7 +18,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         if (!token) {
             router.push("/login");
-        } else if (userRole !== "ROLE_ADMIN") {
+        } else if (userRole !== "ROLE_ENSEIGNANT") {
             router.push("/dashboard");
         } else {
             setIsLoading(false);
@@ -40,11 +40,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
 
     const navLinks = [
-        { name: "Tableau de bord", href: "/admin/dashboard", icon: LayoutDashboard },
-        { name: "Étudiants", href: "/admin/etudiants", icon: Users },
-        { name: "Enseignants", href: "/admin/enseignants", icon: User },
-        { name: "Classes", href: "/admin/classes", icon: Calendar },
-        { name: "Notes", href: "/admin/notes", icon: FileText },
+        { name: "Tableau de bord", href: "/enseignant/dashboard", icon: LayoutDashboard },
+        { name: "Saisie des Notes", href: "/enseignant/notes", icon: FileText },
     ];
 
     return (
@@ -58,7 +55,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </div>
 
                 <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-                    <div className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-4 px-2">Espace Admin</div>
+                    <div className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-4 px-2">Espace Enseignant</div>
 
                     {navLinks.map((link) => {
                         const Icon = link.icon;
@@ -99,9 +96,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 {/* Header */}
                 <header className="bg-white shadow-sm px-8 py-4 flex items-center justify-between z-10">
                     <div className="flex items-center gap-4">
-                        <h1 className="text-2xl font-bold text-[#042954]">Administration</h1>
-                        <span className="px-3 py-1 bg-[#e3f2fd] text-[#03a9f4] text-xs font-bold rounded-full">
-                            Espace ADMIN
+                        <h1 className="text-2xl font-bold text-[#042954]">Enseignant</h1>
+                        <span className="px-3 py-1 bg-[#fff3e0] text-[#ffa000] text-xs font-bold rounded-full">
+                            Espace ENSEIGNANT
                         </span>
                     </div>
 
@@ -112,11 +109,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         </button>
                         <div className="flex items-center gap-3 border-l pl-4">
                             <div className="hidden sm:block text-right">
-                                <p className="text-sm font-bold text-[#333333]">Administrateur</p>
+                                <p className="text-sm font-bold text-[#333333]">Enseignant</p>
                                 <p className="text-xs text-gray-500">{userEmail}</p>
                             </div>
                             <div className="w-10 h-10 rounded-full bg-[#042954] flex items-center justify-center text-white font-bold shadow-md cursor-pointer hover:bg-[#03a9f4] transition-colors">
-                                AD
+                                EN
                             </div>
                         </div>
                     </div>

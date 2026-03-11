@@ -16,7 +16,7 @@ export const api = {
     },
 
     get: async (endpoint: string) => {
-        const token = localStorage.getItem("token");
+        const token = sessionStorage.getItem("token");
         const res = await fetch(`${API_URL}${endpoint}`, {
             headers: {
                 "Authorization": `Bearer ${token}`,
@@ -32,7 +32,7 @@ export const api = {
     },
 
     post: async (endpoint: string, data: any) => {
-        const token = localStorage.getItem("token");
+        const token = sessionStorage.getItem("token");
         const res = await fetch(`${API_URL}${endpoint}`, {
             method: "POST",
             headers: {
@@ -50,7 +50,7 @@ export const api = {
     },
 
     put: async (endpoint: string, data: any) => {
-        const token = localStorage.getItem("token");
+        const token = sessionStorage.getItem("token");
         const res = await fetch(`${API_URL}${endpoint}`, {
             method: "PUT",
             headers: {
@@ -68,7 +68,7 @@ export const api = {
     },
 
     delete: async (endpoint: string) => {
-        const token = localStorage.getItem("token");
+        const token = sessionStorage.getItem("token");
         const res = await fetch(`${API_URL}${endpoint}`, {
             method: "DELETE",
             headers: {

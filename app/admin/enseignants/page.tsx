@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, Plus, Edit2, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Edit2, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
@@ -23,7 +23,7 @@ export default function EnseignantsListPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    const [itemsPerPage, setItemsPerPage] = useState(5);
 
     const fetchEnseignants = async () => {
         setIsLoading(true);
@@ -74,7 +74,7 @@ export default function EnseignantsListPage() {
     );
 
     const handleExportPdf = () => {
-        const token = localStorage.getItem("token");
+        const token = sessionStorage.getItem("token");
         fetch("http://localhost:8080/api/admin/enseignants/export/pdf", {
             headers: { "Authorization": `Bearer ${token}` }
         })
@@ -202,16 +202,39 @@ export default function EnseignantsListPage() {
             </div>
 
             {/* Pagination */}
-            {!isLoading && totalPages > 1 && (
+            {!isLoading && filteredEnseignants.length > 0 && (
                 <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm">
-                    <span className="text-gray-500 font-medium">
-                        Affichage de {(currentPage - 1) * itemsPerPage + 1} à {Math.min(currentPage * itemsPerPage, filteredEnseignants.length)} sur {filteredEnseignants.length} résultats
-                    </span>
+                    <div className="flex items-center gap-3">
+                        <span className="text-gray-500 font-medium">
+                            Affichage de {(currentPage - 1) * itemsPerPage + 1} à {Math.min(currentPage * itemsPerPage, filteredEnseignants.length)} sur {filteredEnseignants.length}
+                        </span>
+                        <div className="flex items-center gap-2 border-l pl-3">
+                            <span className="text-gray-500">Afficher:</span>
+                            <select
+                                value={itemsPerPage}
+                                onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                                className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#ffa000]"
+                            >
+                                {[5, 10, 25, 50].map(n => (
+                                    <option key={n} value={n}>{n}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
                     <div className="flex items-center gap-1">
+                        <button
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(1)}
+                            className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            title="Première page"
+                        >
+                            <ChevronsLeft size={18} />
+                        </button>
                         <button
                             disabled={currentPage === 1}
                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                             className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            title="Page précédente"
                         >
                             <ChevronLeft size={18} />
                         </button>
@@ -233,8 +256,17 @@ export default function EnseignantsListPage() {
                             disabled={currentPage === totalPages}
                             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                             className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            title="Page suivante"
                         >
                             <ChevronRight size={18} />
+                        </button>
+                        <button
+                            disabled={currentPage === totalPages}
+                            onClick={() => setCurrentPage(totalPages)}
+                            className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            title="Dernière page"
+                        >
+                            <ChevronsRight size={18} />
                         </button>
                     </div>
                 </div>

@@ -1,105 +1,127 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, Plus, Edit2, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Search, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileDown, Filter } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
 
-interface Etudiant {
+interface Note {
     id: number;
-    matricule: string;
-    nom: string;
-    prenom: string;
-    email: string;
-    telephone: string;
-    statut: string; // ex: "Actif", "Inactif"
+    etudiantNom: string;
+    etudiantPrenom: string;
+    etudiantId: number;
+    matiere: string;
+    note: number;
+    type: string;
+    semestre: string;
+    enseignantNom: string;
+    enseignantPrenom: string;
 }
 
-export default function EtudiantsListPage() {
-    const [etudiants, setEtudiants] = useState<Etudiant[]>([]);
+const SEMESTRES = ["Tous", "S1", "S2", "S3", "S4", "S5", "S6"];
+
+export default function AdminNotesListPage() {
+    const [notes, setNotes] = useState<Note[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [selectedSemestre, setSelectedSemestre] = useState("Tous");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(5);
 
-    const fetchEtudiants = async () => {
+    const fetchNotes = async () => {
         setIsLoading(true);
         try {
-            const data = await api.get("/api/admin/etudiants");
+            const data = await api.get("/api/admin/notes");
             if (data && Array.isArray(data.content)) {
-                setEtudiants(data.content);
+                setNotes(data.content);
             } else if (Array.isArray(data)) {
-                setEtudiants(data);
+                setNotes(data);
             } else {
-                setEtudiants([]);
+                setNotes([]);
             }
         } catch (error: any) {
-            toast.error(error.message || "Erreur lors du chargement des étudiants.");
+            toast.error(error.message || "Erreur lors du chargement des notes.");
         } finally {
             setIsLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchEtudiants();
+        fetchNotes();
     }, []);
 
     const handleDelete = async (id: number) => {
-        if (!window.confirm("Êtes-vous sûr de vouloir supprimer cet étudiant ?")) return;
+        if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette note ?")) return;
 
         try {
-            await api.delete(`/api/admin/etudiants/${id}`);
-            toast.success("Étudiant supprimé avec succès.");
-            setEtudiants(etudiants.filter(e => e.id !== id));
+            await api.delete(`/api/admin/notes/${id}`);
+            toast.success("Note supprimée avec succès.");
+            setNotes(notes.filter(n => n.id !== id));
         } catch (error: any) {
             toast.error(error.message || "Erreur lors de la suppression.");
         }
     };
 
-    // Filtrer les étudiants (recherche)
-    const filteredEtudiants = etudiants.filter(e =>
-        e.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.matricule.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Filtrer les notes
+    const filteredNotes = notes.filter(n => {
+        const matchSearch =
+            (n.etudiantNom + " " + n.etudiantPrenom).toLowerCase().includes(searchTerm.toLowerCase()) ||
+            n.matiere?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchSemestre = selectedSemestre === "Tous" || n.semestre === selectedSemestre;
+        return matchSearch && matchSemestre;
+    });
 
     // Pagination
-    const totalPages = Math.ceil(filteredEtudiants.length / itemsPerPage);
-    const paginatedEtudiants = filteredEtudiants.slice(
+    const totalPages = Math.ceil(filteredNotes.length / itemsPerPage);
+    const paginatedNotes = filteredNotes.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
-    const handleExportPdf = () => {
-        const token = sessionStorage.getItem("token");
-        fetch("http://localhost:8080/api/admin/etudiants/export/pdf", {
-            headers: { "Authorization": `Bearer ${token}` }
-        })
-            .then(res => res.blob())
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "etudiants.pdf";
-                a.click();
-            });
+
+    const getNoteColor = (note: number) => {
+        if (note >= 16) return "bg-green-100 text-green-700";
+        if (note >= 12) return "bg-blue-100 text-blue-700";
+        if (note >= 10) return "bg-yellow-100 text-yellow-700";
+        return "bg-red-100 text-red-700";
+    };
+
+    const getTypeBadge = (type: string) => {
+        switch (type) {
+            case "EXAMEN": return "bg-purple-100 text-purple-700";
+            case "CONTROLE": return "bg-orange-100 text-orange-700";
+            case "TP": return "bg-cyan-100 text-cyan-700";
+            case "PROJET": return "bg-indigo-100 text-indigo-700";
+            default: return "bg-gray-100 text-gray-700";
+        }
     };
 
     return (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             {/* Header / Actions */}
             <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <h2 className="text-xl font-bold text-[#042954]">Liste des Étudiants</h2>
-                <button onClick={handleExportPdf} className="px-4 py-2 bg-red-600 text-white rounded-lg">
-                    Export PDF
-                </button>
+                <h2 className="text-xl font-bold text-[#042954]">Gestion des Notes</h2>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    {/* Filtre semestre */}
+                    <div className="relative flex items-center gap-2">
+                        <Filter size={16} className="text-gray-400" />
+                        <select
+                            value={selectedSemestre}
+                            onChange={(e) => { setSelectedSemestre(e.target.value); setCurrentPage(1); }}
+                            className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ffa000] transition-shadow"
+                        >
+                            {SEMESTRES.map(s => (
+                                <option key={s} value={s}>{s === "Tous" ? "Tous les semestres" : `Semestre ${s}`}</option>
+                            ))}
+                        </select>
+                    </div>
+
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input
                             type="text"
-                            placeholder="Rechercher (nom, matricule)..."
+                            placeholder="Rechercher (étudiant, matière)..."
                             value={searchTerm}
                             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                             className="w-full sm:w-64 pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ffa000] transition-shadow text-sm"
@@ -107,11 +129,11 @@ export default function EtudiantsListPage() {
                     </div>
 
                     <Link
-                        href="/admin/etudiants/create"
+                        href="/admin/notes/bulletin"
                         className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm whitespace-nowrap text-sm"
                     >
-                        <Plus size={18} />
-                        Ajouter Nouveau
+                        <FileDown size={18} />
+                        Générer Bulletin
                     </Link>
                 </div>
             </div>
@@ -122,61 +144,62 @@ export default function EtudiantsListPage() {
                     <thead>
                         <tr className="bg-gray-50 text-gray-500 border-b border-gray-200 text-sm">
                             <th className="p-4 font-semibold text-center w-16">#</th>
-                            <th className="p-4 font-semibold">Matricule</th>
-                            <th className="p-4 font-semibold">Nom & Prénom</th>
-                            <th className="p-4 font-semibold">Email</th>
-                            <th className="p-4 font-semibold">Téléphone</th>
-                            <th className="p-4 font-semibold text-center">Statut</th>
+                            <th className="p-4 font-semibold">Étudiant</th>
+                            <th className="p-4 font-semibold">Matière</th>
+                            <th className="p-4 font-semibold text-center">Note / 20</th>
+                            <th className="p-4 font-semibold text-center">Type</th>
+                            <th className="p-4 font-semibold text-center">Semestre</th>
+                            <th className="p-4 font-semibold">Enseignant</th>
                             <th className="p-4 font-semibold text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {isLoading ? (
                             <tr>
-                                <td colSpan={7} className="p-8 text-center text-gray-500">Chargement en cours...</td>
+                                <td colSpan={8} className="p-8 text-center text-gray-500">
+                                    <div className="flex items-center justify-center gap-3">
+                                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#ffa000]"></div>
+                                        Chargement en cours...
+                                    </div>
+                                </td>
                             </tr>
-                        ) : paginatedEtudiants.length === 0 ? (
+                        ) : paginatedNotes.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="p-8 text-center text-gray-500">Aucun étudiant trouvé.</td>
+                                <td colSpan={8} className="p-8 text-center text-gray-500">Aucune note trouvée.</td>
                             </tr>
                         ) : (
-                            paginatedEtudiants.map((etudiant, index) => (
-                                <tr key={etudiant.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                            paginatedNotes.map((note, index) => (
+                                <tr key={note.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
                                     <td className="p-4 text-center text-sm text-gray-400 font-medium">
                                         {(currentPage - 1) * itemsPerPage + index + 1}
                                     </td>
                                     <td className="p-4">
-                                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-bold tracking-wide">
-                                            {etudiant.matricule || "N/A"}
-                                        </span>
-                                    </td>
-                                    <td className="p-4">
-                                        <div className="font-bold text-[#333333]">{etudiant.nom} {etudiant.prenom}</div>
-                                    </td>
-                                    <td className="p-4 text-gray-500 text-sm truncate max-w-[200px]">
-                                        {etudiant.email}
+                                        <div className="font-bold text-[#333333]">{note.etudiantNom} {note.etudiantPrenom}</div>
                                     </td>
                                     <td className="p-4 text-gray-500 text-sm">
-                                        {etudiant.telephone || "-"}
+                                        {note.matiere || "-"}
                                     </td>
                                     <td className="p-4 text-center">
-                                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${etudiant.statut === 'Actif' || etudiant.statut === undefined
-                                            ? 'bg-green-100 text-green-700'
-                                            : 'bg-red-100 text-red-700'
-                                            }`}>
-                                            {etudiant.statut || "Actif"}
+                                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getNoteColor(note.note)}`}>
+                                            {note.note != null ? note.note.toFixed(2) : "-"}
                                         </span>
                                     </td>
+                                    <td className="p-4 text-center">
+                                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getTypeBadge(note.type)}`}>
+                                            {note.type || "-"}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-center">
+                                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-bold tracking-wide">
+                                            {note.semestre || "-"}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-gray-500 text-sm">
+                                        {note.enseignantNom ? `${note.enseignantNom} ${note.enseignantPrenom || ""}` : "-"}
+                                    </td>
                                     <td className="p-4 flex items-center justify-end gap-2">
-                                        <Link
-                                            href={`/admin/etudiants/${etudiant.id}/edit`}
-                                            className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
-                                            title="Modifier"
-                                        >
-                                            <Edit2 size={16} />
-                                        </Link>
                                         <button
-                                            onClick={() => handleDelete(etudiant.id)}
+                                            onClick={() => handleDelete(note.id)}
                                             className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors cursor-pointer"
                                             title="Supprimer"
                                         >
@@ -191,11 +214,11 @@ export default function EtudiantsListPage() {
             </div>
 
             {/* Pagination */}
-            {!isLoading && filteredEtudiants.length > 0 && (
+            {!isLoading && filteredNotes.length > 0 && (
                 <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm">
                     <div className="flex items-center gap-3">
                         <span className="text-gray-500 font-medium">
-                            Affichage de {(currentPage - 1) * itemsPerPage + 1} à {Math.min(currentPage * itemsPerPage, filteredEtudiants.length)} sur {filteredEtudiants.length}
+                            Affichage de {(currentPage - 1) * itemsPerPage + 1} à {Math.min(currentPage * itemsPerPage, filteredNotes.length)} sur {filteredNotes.length}
                         </span>
                         <div className="flex items-center gap-2 border-l pl-3">
                             <span className="text-gray-500">Afficher:</span>
