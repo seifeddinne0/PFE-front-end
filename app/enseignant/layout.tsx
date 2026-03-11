@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { LogOut, FileText, Settings, Bell, LayoutDashboard, BookOpen } from "lucide-react";
+import { LogOut, FileText, Settings, Bell, LayoutDashboard, BookOpen, UserX } from "lucide-react";
 import Link from "next/link";
 import { Toaster } from 'react-hot-toast';
 
@@ -42,6 +42,7 @@ export default function EnseignantLayout({ children }: { children: React.ReactNo
     const navLinks = [
         { name: "Tableau de bord", href: "/enseignant/dashboard", icon: LayoutDashboard },
         { name: "Saisie des Notes", href: "/enseignant/notes", icon: FileText },
+        { name: "Absences", href: "/enseignant/absences", icon: UserX },
     ];
 
     return (

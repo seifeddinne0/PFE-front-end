@@ -67,6 +67,24 @@ export const api = {
         return res.json();
     },
 
+    patch: async (endpoint: string, data: any) => {
+        const token = sessionStorage.getItem("token");
+        const res = await fetch(`${API_URL}${endpoint}`, {
+            method: "PATCH",
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+        });
+
+        if (!res.ok) {
+            throw new Error("Erreur lors de la mise à jour des données");
+        }
+
+        return res.json();
+    },
+
     delete: async (endpoint: string) => {
         const token = sessionStorage.getItem("token");
         const res = await fetch(`${API_URL}${endpoint}`, {
