@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { LogOut, BookOpen, Settings, Bell, LayoutDashboard, UserX } from "lucide-react";
+import { LogOut, BookOpen, Settings, Bell, LayoutDashboard, UserX, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { Toaster } from 'react-hot-toast';
 
@@ -44,6 +44,7 @@ export default function EtudiantLayout({ children }: { children: React.ReactNode
         { name: "Tableau de bord", href: "/etudiant/dashboard", icon: LayoutDashboard },
         { name: "Mes Cours", href: "/etudiant/cours", icon: BookOpen },
         { name: "Mes Absences", href: "/etudiant/absences", icon: UserX },
+        { name: "Mes Factures", href: "/etudiant/factures", icon: CreditCard },
     ];
 
     return (

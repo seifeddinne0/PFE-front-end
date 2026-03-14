@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { LogOut, User, BookOpen, Settings, Bell, LayoutDashboard, FileText, Users, Calendar, UserX } from "lucide-react";
+import { LogOut, User, BookOpen, Settings, Bell, LayoutDashboard, FileText, Users, Calendar, UserX, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { Toaster } from 'react-hot-toast';
 
@@ -46,6 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: "Classes", href: "/admin/classes", icon: Calendar },
         { name: "Notes", href: "/admin/notes", icon: FileText },
         { name: "Absences", href: "/admin/absences", icon: UserX },
+        { name: "Factures", href: "/admin/factures", icon: CreditCard },
     ];
 
     return (

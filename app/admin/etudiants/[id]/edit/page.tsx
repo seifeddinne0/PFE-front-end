@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
@@ -14,10 +14,12 @@ export default function EditEtudiantPage() {
 
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching, setIsFetching] = useState(true);
+    const [showPassword, setShowPassword] = useState(false);
     const [formData, setFormData] = useState({
         nom: "",
         prenom: "",
         email: "",
+        password: "",
         telephone: "",
         dateNaissance: "",
         adresse: ""
@@ -31,6 +33,7 @@ export default function EditEtudiantPage() {
                     nom: data.nom || "",
                     prenom: data.prenom || "",
                     email: data.email || "",
+                    password: "",
                     telephone: data.telephone || "",
                     dateNaissance: data.dateNaissance || "",
                     adresse: data.adresse || ""
@@ -58,8 +61,11 @@ export default function EditEtudiantPage() {
         setIsLoading(true);
 
         try {
-            const { dateNaissance, ...restPayload } = formData;
-            const payload = dateNaissance ? formData : restPayload;
+            const { dateNaissance, password, ...restPayload } = formData;
+            const payload: any = dateNaissance ? { ...restPayload, dateNaissance } : { ...restPayload };
+            if (password && password.trim() !== "") {
+                payload.password = password;
+            }
 
             await api.put(`/api/admin/etudiants/${studentId}`, payload);
             toast.success("Les informations ont été mises à jour.");
@@ -139,6 +145,29 @@ export default function EditEtudiantPage() {
                                 onChange={handleChange}
                                 className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm"
                             />
+                        </div>
+
+                        {/* Nouveau mot de passe */}
+                        <div className="space-y-2">
+                            <label htmlFor="password" className="text-sm font-bold text-[#333333]">Nouveau mot de passe</label>
+                            <div className="relative">
+                                <input
+                                    id="password"
+                                    name="password"
+                                    type={showPassword ? "text" : "password"}
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm pr-12"
+                                    placeholder="Laisser vide pour ne pas changer"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
                         </div>
 
                         {/* Téléphone */}

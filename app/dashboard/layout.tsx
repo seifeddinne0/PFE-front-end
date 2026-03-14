@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { LogOut, User, BookOpen, Settings, Bell, LayoutDashboard, FileText, Users, Calendar, UserX } from "lucide-react";
+import { LogOut, User, BookOpen, Settings, Bell, LayoutDashboard, FileText, Users, Calendar, UserX, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { Toaster } from 'react-hot-toast';
 
@@ -46,6 +46,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { name: "Cours & Modules", href: "/dashboard/cours", icon: BookOpen, exact: false },
         { name: "Notes & Résultats", href: "/dashboard/notes", icon: FileText, exact: false },
         { name: "Absences", href: role ? `/${role.replace("ROLE_", "").toLowerCase()}/absences` : "/absences", icon: UserX, exact: false },
+        ...(role === "ROLE_ADMIN" || role === "ROLE_ETUDIANT" ? [{ name: "Factures", href: `/${role.replace("ROLE_", "").toLowerCase()}/factures`, icon: CreditCard, exact: false }] : []),
     ];
 
     return (
