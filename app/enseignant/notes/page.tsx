@@ -214,7 +214,7 @@ export default function EnseignantNotesPage() {
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse hidden md:table">
                         <thead>
                             <tr className="bg-gray-50 text-gray-500 border-b border-gray-200 text-sm">
                                 <th className="p-4 font-semibold text-center w-16">#</th>
@@ -288,6 +288,59 @@ export default function EnseignantNotesPage() {
                             )}
                         </tbody>
                     </table>
+
+                    {/* Mobile version (Cards) */}
+                    <div className="grid grid-cols-1 gap-4 p-4 md:hidden bg-gray-50/30">
+                        {isLoading ? (
+                            <div className="p-8 text-center text-gray-500 flex justify-center items-center gap-3">
+                                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#ffa000]"></div>
+                                Chargement en cours...
+                            </div>
+                        ) : paginatedNotes.length === 0 ? (
+                            <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100">Aucune note trouvée.</div>
+                        ) : (
+                            paginatedNotes.map((note) => (
+                                <div key={note.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative flex flex-col gap-3">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="font-bold text-[#333333] text-lg mb-1">{note.etudiantNom} {note.etudiantPrenom}</div>
+                                            <div className="flex gap-2 mb-2">
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getTypeBadge(note.type)}`}>{note.type || "-"}</span>
+                                                <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold">{note.semestre || "-"}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col items-end">
+                                            <span className={`px-3 py-1.5 rounded-lg text-xl font-bold shadow-sm ${getNoteColor(note.note)}`}>
+                                                {note.note != null ? note.note.toFixed(2) : "-"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm">
+                                        <div className="flex justify-between items-center py-1 border-b border-gray-200">
+                                            <span className="text-gray-500">Matière</span>
+                                            <span className="font-bold text-[#042954] text-right">{note.matiere || "-"}</span>
+                                        </div>
+                                        <div>
+                                            <span className="block text-gray-500 text-xs mb-1 mt-1">Commentaire</span>
+                                            <div className="bg-gray-100 p-2 rounded text-xs text-gray-700">
+                                                {note.commentaire || "Aucun commentaire"}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                                        <button onClick={() => openEditModal(note)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded" title="Modifier">
+                                            <Edit2 size={16} />
+                                        </button>
+                                        <button onClick={() => handleDelete(note.id)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded" title="Supprimer">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
 
                 {/* Pagination */}

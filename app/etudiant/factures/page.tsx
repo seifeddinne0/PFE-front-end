@@ -170,7 +170,7 @@ export default function EtudiantFacturesPage() {
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse hidden md:table">
                         <thead>
                             <tr className="bg-gray-50 text-gray-500 border-b border-gray-200 text-sm">
                                 <th className="p-4 font-semibold">Numéro</th>
@@ -236,6 +236,61 @@ export default function EtudiantFacturesPage() {
                             )}
                         </tbody>
                     </table>
+
+                    {/* Mobile version (Cards) */}
+                    <div className="grid grid-cols-1 gap-4 p-4 md:hidden bg-gray-50/30">
+                        {isLoading ? (
+                            <div className="p-8 text-center text-gray-500 flex justify-center items-center gap-2">
+                                <div className="w-5 h-5 border-2 border-[#042954] border-t-transparent rounded-full animate-spin"></div>
+                                Chargement en cours...
+                            </div>
+                        ) : paginatedFactures.length === 0 ? (
+                            <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100">Aucune facture trouvée.</div>
+                        ) : (
+                            paginatedFactures.map((facture) => {
+                                const isRowOverdue = isOverdue(facture);
+                                return (
+                                    <div key={facture.id} className={`bg-white p-4 rounded-xl shadow-sm border relative flex flex-col gap-3 transition-colors ${isRowOverdue ? 'border-red-200 bg-red-50/30' : 'border-gray-200'}`}>
+                                        <div className="flex justify-between items-start mb-1">
+                                            <div className="flex flex-col gap-1 pr-2">
+                                                <div className="flex items-center gap-2">
+                                                    <FileText size={18} className="text-[#ffa000]"/>
+                                                    <span className="font-bold text-[#333333] text-base">{facture.numero}</span>
+                                                </div>
+                                                <div className="font-semibold text-sm text-[#042954]">{facture.type}</div>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-1 shrink-0">
+                                                <span className="font-bold text-xl text-gray-800 tracking-tight">{formatMontant(facture.montant)}</span>
+                                                {getStatutBadge(facture.statut)}
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-2 bg-white/60 p-3 rounded-lg border border-gray-100 text-sm">
+                                            <div className="flex justify-between items-center py-1 border-b border-gray-200">
+                                                <span className="text-gray-500">Échéance</span>
+                                                <span className={isRowOverdue ? "text-red-600 font-bold flex items-center gap-1" : "font-medium text-gray-700"}>
+                                                    {formatDate(facture.dateEcheance)}
+                                                    {isRowOverdue && <AlertCircle size={14} />}
+                                                </span>
+                                            </div>
+                                            {(facture.statut === 'PAYEE' || facture.datePaiement) && (
+                                                <div className="flex justify-between items-center py-1 border-b border-gray-200">
+                                                    <span className="text-gray-500">Payé le</span>
+                                                    <span className="font-medium text-gray-700">{formatDate(facture.datePaiement)}</span>
+                                                </div>
+                                            )}
+                                            <div>
+                                                <span className="block text-gray-500 text-xs mb-1 mt-1">Description</span>
+                                                <div className="bg-gray-100 p-2 rounded text-xs text-gray-700">
+                                                    {facture.description || "Aucune description"}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
                 </div>
 
                 {/* Pagination */}

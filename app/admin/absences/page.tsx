@@ -154,7 +154,7 @@ export default function AdminAbsencesPage() {
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse hidden md:table">
                         <thead>
                             <tr className="bg-gray-50 text-gray-500 border-b border-gray-200 text-sm">
                                 <th className="p-4 font-semibold">Étudiant</th>
@@ -237,6 +237,67 @@ export default function AdminAbsencesPage() {
                             )}
                         </tbody>
                     </table>
+
+                    {/* Mobile version (Cards) */}
+                    <div className="grid grid-cols-1 gap-4 p-4 md:hidden bg-gray-50/30">
+                        {isLoading ? (
+                            <div className="p-8 text-center text-gray-500 flex justify-center items-center gap-3">
+                                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#ffa000]"></div>
+                                Chargement des absences...
+                            </div>
+                        ) : paginatedAbsences.length === 0 ? (
+                            <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100">Aucune absence trouvée.</div>
+                        ) : (
+                            paginatedAbsences.map((absence) => (
+                                <div key={absence.id} className={`bg-white p-4 rounded-xl shadow-sm relative flex flex-col gap-3 border transition-colors ${absence.alerte ? 'border-red-200' : 'border-gray-200'}`}>
+                                    {absence.alerte && (
+                                        <div className="absolute top-4 right-4 animate-pulse">
+                                            <AlertTriangle size={20} className="text-red-500" />
+                                        </div>
+                                    )}
+                                    <div className="flex flex-col pr-8">
+                                        <div className="font-bold text-[#333333] text-lg mb-1">{absence.etudiantNom} {absence.etudiantPrenom}</div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${getStatutBadge(absence.statut)}`}>
+                                                {absence.statut.replace('_', ' ')}
+                                            </span>
+                                            <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{absence.etudiantMatricule}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm">
+                                        <div className="flex justify-between items-center py-1 border-b border-gray-200">
+                                            <span className="text-gray-500">Matière</span>
+                                            <span className="font-bold text-[#042954] text-right">{absence.matiere}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center py-1 border-b border-gray-200">
+                                            <span className="text-gray-500">Date</span>
+                                            <span className="font-medium text-gray-700 text-right">{formatDate(absence.dateAbsence)}</span>
+                                        </div>
+                                        <div>
+                                            <span className="block text-gray-500 mb-1">Motif / Justification</span>
+                                            {absence.statut === "JUSTIFIEE" && absence.justification ? (
+                                                <div className="bg-green-50 text-green-800 p-2 rounded text-xs border border-green-100">
+                                                    {absence.justification}
+                                                </div>
+                                            ) : (
+                                                <div className="bg-gray-100 text-gray-600 p-2 rounded text-xs">
+                                                    {absence.motif || "Aucun motif"}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                                        {absence.statut !== "JUSTIFIEE" && (
+                                            <button onClick={() => { setJustifyingAbsence(absence); setJustification(""); }} className="p-2 px-3 text-sm flex items-center gap-1 text-green-600 bg-green-50 hover:bg-green-100 rounded" title="Justifier l'absence"><CheckCircle size={16} /> Justifier</button>
+                                        )}
+                                        <button onClick={() => handleDelete(absence.id)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded" title="Supprimer"><Trash2 size={16} /></button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
 
                 {/* Pagination */}

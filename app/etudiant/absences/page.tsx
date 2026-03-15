@@ -156,7 +156,7 @@ export default function EtudiantAbsencesPage() {
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse min-w-[800px] md:min-w-full hidden md:table">
                         <thead>
                             <tr className="bg-gray-50 text-gray-500 border-b border-gray-200 text-sm">
                                 <th className="p-4 font-semibold text-center w-16">#</th>
@@ -226,6 +226,53 @@ export default function EtudiantAbsencesPage() {
                             )}
                         </tbody>
                     </table>
+
+                    {/* Mobile version (Cards) */}
+                    <div className="grid grid-cols-1 gap-4 p-4 md:hidden bg-gray-50/30">
+                        {absences.length === 0 ? (
+                            <div className="p-8 border border-dashed border-gray-200 rounded-xl text-center flex flex-col items-center justify-center gap-3">
+                                <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center">
+                                    <CheckCircle className="text-green-500" size={32} />
+                                </div>
+                                <p className="text-lg font-medium text-gray-700">Aucune absence enregistrée</p>
+                                <p className="text-sm">Vous avez assisté à tous vos cours.</p>
+                            </div>
+                        ) : (
+                            paginatedAbsences.map((absence, index) => (
+                                <div key={absence.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative overflow-hidden">
+                                    {absence.alerte && (
+                                        <div className="absolute top-0 right-0 w-2 h-full bg-red-400"></div>
+                                    )}
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="flex items-center gap-2 text-gray-500 text-sm">
+                                            <Clock size={16} />
+                                            <span className="font-semibold text-gray-800">{formatDate(absence.dateAbsence)}</span>
+                                        </div>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatutBadge(absence.statut)}`}>
+                                            {absence.statut.replace('_', ' ')}
+                                        </span>
+                                    </div>
+                                    
+                                    <h3 className="font-bold text-[#042954] mb-3 text-lg leading-tight">
+                                        {absence.matiere || "-"}
+                                    </h3>
+                                    
+                                    <div className="space-y-2 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                        <div className="flex justify-between gap-2 border-b border-gray-100 pb-2">
+                                            <span className="font-medium text-gray-400">Motif initial</span>
+                                            <span className="text-right">{absence.motif || "-"}</span>
+                                        </div>
+                                        <div className="flex justify-between gap-2 pt-1">
+                                            <span className="font-medium text-gray-400">Justification</span>
+                                            <span className={`text-right ${absence.statut === "JUSTIFIEE" ? 'text-green-600 font-medium' : ''}`}>
+                                                {absence.justification || "-"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
 
                 {/* Pagination */}

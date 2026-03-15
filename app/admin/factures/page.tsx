@@ -15,8 +15,11 @@ interface Etudiant {
 interface Facture {
     id: number;
     numero: string;
-    etudiant: Etudiant;
-    type: string;
+    etudiantId: number;
+    etudiantNom: string;
+    etudiantPrenom: string;
+    etudiantMatricule: string;
+    typeFacture: string;
     description?: string;
     montant: number;
     dateEcheance: string;
@@ -36,25 +39,21 @@ export default function AdminFacturesPage() {
     const [etudiants, setEtudiants] = useState<Etudiant[]>([]);
     const [stats, setStats] = useState<FactureStats>({ totalPayee: 0, totalImpaye: 0, countPayee: 0, countNonPayee: 0 });
     const [isLoading, setIsLoading] = useState(true);
-    
-    // Filtres et Recherche
+
     const [searchTerm, setSearchTerm] = useState("");
     const [statutFilter, setStatutFilter] = useState("Tous");
-    
-    // Pagination
+
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
-    
-    // Modals
+
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [currentFacture, setCurrentFacture] = useState<Facture | null>(null);
 
-    // Form
     const [formData, setFormData] = useState({
         etudiantId: "",
         montant: "",
-        type: "SCOLARITE",
+        typeFacture: "SCOLARITE",
         description: "",
         dateEcheance: ""
     });
@@ -103,7 +102,7 @@ export default function AdminFacturesPage() {
     };
 
     useEffect(() => {
-        const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+        const token = sessionStorage.getItem("token");
         if (!token) {
             window.location.href = "/login";
             return;
@@ -125,7 +124,7 @@ export default function AdminFacturesPage() {
     const handleMarkAsPaid = async (id: number) => {
         if (!window.confirm("Confirmer le paiement de cette facture ?")) return;
         try {
-            await api.patch(`/api/admin/factures/${id}/payer`);
+            await api.patch(`/api/admin/factures/${id}/payer`, {});
             toast.success("Facture marquée comme payée!");
             loadData();
         } catch (error: any) {
@@ -136,7 +135,7 @@ export default function AdminFacturesPage() {
     const handleCancel = async (id: number) => {
         if (!window.confirm("Confirmer l'annulation de cette facture ?")) return;
         try {
-            await api.patch(`/api/admin/factures/${id}/annuler`);
+            await api.patch(`/api/admin/factures/${id}/annuler`, {});
             toast.success("Facture annulée!");
             loadData();
         } catch (error: any) {
@@ -148,16 +147,16 @@ export default function AdminFacturesPage() {
         e.preventDefault();
         try {
             const payload = {
-                etudiant: { id: parseInt(formData.etudiantId) },
+                etudiantId: parseInt(formData.etudiantId),
                 montant: parseFloat(formData.montant),
-                type: formData.type,
+                typeFacture: formData.typeFacture,
                 description: formData.description,
                 dateEcheance: formData.dateEcheance
             };
             const res = await api.post("/api/admin/factures", payload);
             toast.success(`Facture ${res.numero || 'créée'} avec succès!`);
             setIsCreateModalOpen(false);
-            setFormData({ etudiantId: "", montant: "", type: "SCOLARITE", description: "", dateEcheance: "" });
+            setFormData({ etudiantId: "", montant: "", typeFacture: "SCOLARITE", description: "", dateEcheance: "" });
             loadData();
         } catch (error: any) {
             toast.error(error.message || "Erreur lors de la création.");
@@ -169,9 +168,9 @@ export default function AdminFacturesPage() {
         if (!currentFacture) return;
         try {
             const payload = {
-                etudiant: { id: parseInt(formData.etudiantId) },
+                etudiantId: parseInt(formData.etudiantId),
                 montant: parseFloat(formData.montant),
-                type: formData.type,
+                typeFacture: formData.typeFacture,
                 description: formData.description,
                 dateEcheance: formData.dateEcheance
             };
@@ -187,9 +186,9 @@ export default function AdminFacturesPage() {
     const openEditModal = (f: Facture) => {
         setCurrentFacture(f);
         setFormData({
-            etudiantId: f.etudiant && f.etudiant.id ? f.etudiant.id.toString() : "",
+            etudiantId: f.etudiantId ? f.etudiantId.toString() : "",
             montant: f.montant.toString(),
-            type: f.type,
+            typeFacture: f.typeFacture || "SCOLARITE",
             description: f.description || "",
             dateEcheance: f.dateEcheance ? f.dateEcheance.substring(0, 10) : ""
         });
@@ -198,7 +197,7 @@ export default function AdminFacturesPage() {
 
     const handleExportPdfAll = async () => {
         try {
-            const token = localStorage.getItem("token");
+            const token = sessionStorage.getItem("token");
             const response = await fetch('http://localhost:8080/api/admin/factures/export/pdf', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -217,7 +216,7 @@ export default function AdminFacturesPage() {
 
     const handleExportPdfStudent = async (etudiantId: number, matricule: string) => {
         try {
-            const token = localStorage.getItem("token");
+            const token = sessionStorage.getItem("token");
             const response = await fetch(`http://localhost:8080/api/admin/factures/export/pdf/${etudiantId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -234,7 +233,6 @@ export default function AdminFacturesPage() {
         }
     };
 
-    // Formatters
     const formatMontant = (mnt?: number) => {
         if (mnt === undefined || mnt === null) return "0,00 DT";
         return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(mnt) + " DT";
@@ -243,6 +241,10 @@ export default function AdminFacturesPage() {
     const formatDate = (dateStr?: string) => {
         if (!dateStr) return "-";
         return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
+    const isOverdue = (f: Facture) => {
+        return f.dateEcheance && new Date(f.dateEcheance) < new Date() && f.statut === 'NON_PAYEE';
     };
 
     const getStatutBadge = (statut: string) => {
@@ -255,13 +257,11 @@ export default function AdminFacturesPage() {
         }
     };
 
-    // Filters
     const filteredFactures = factures.filter(f => {
-        const matchesSearch = 
+        const matchesSearch =
             (f.numero && f.numero.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (f.etudiant && `${f.etudiant.nom} ${f.etudiant.prenom}`.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (f.etudiant && f.etudiant.matricule.toLowerCase().includes(searchTerm.toLowerCase()));
-        
+            (`${f.etudiantNom} ${f.etudiantPrenom}`.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (f.etudiantMatricule && f.etudiantMatricule.toLowerCase().includes(searchTerm.toLowerCase()));
         const matchesStatut = statutFilter === "Tous" || f.statut === statutFilter;
         return matchesSearch && matchesStatut;
     });
@@ -316,11 +316,10 @@ export default function AdminFacturesPage() {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <h2 className="text-xl font-bold text-[#042954]">Liste des Factures</h2>
-
                     <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                         <div className="flex items-center gap-2">
                             <Filter size={18} className="text-gray-400" />
-                            <select 
+                            <select
                                 value={statutFilter}
                                 onChange={(e) => { setStatutFilter(e.target.value); setCurrentPage(1); }}
                                 className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ffa000] bg-gray-50"
@@ -342,17 +341,16 @@ export default function AdminFacturesPage() {
                                 className="w-full sm:w-64 pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ffa000] transition-shadow text-sm"
                             />
                         </div>
-
                         <button
                             onClick={handleExportPdfAll}
                             className="bg-[#042954] hover:bg-[#031d3d] text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm whitespace-nowrap text-sm"
                         >
                             <Download size={18} />
-                            Exporter tout en PDF
+                            Exporter PDF
                         </button>
                         <button
                             onClick={() => setIsCreateModalOpen(true)}
-                            className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm whitespace-nowrap text-sm"
+                            className="bg-[#FFA000] hover:bg-[#e69000] text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm whitespace-nowrap text-sm"
                         >
                             <Plus size={18} />
                             Nouvelle Facture
@@ -361,7 +359,7 @@ export default function AdminFacturesPage() {
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse hidden md:table">
                         <thead>
                             <tr className="bg-gray-50 text-gray-500 border-b border-gray-200 text-sm">
                                 <th className="p-4 font-semibold">Numéro</th>
@@ -378,9 +376,11 @@ export default function AdminFacturesPage() {
                         <tbody>
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={9} className="p-8 text-center text-gray-500 flex justify-center items-center gap-2">
-                                        <div className="w-5 h-5 border-2 border-[#042954] border-t-transparent rounded-full animate-spin"></div>
-                                        Chargement en cours...
+                                    <td colSpan={9} className="p-8 text-center text-gray-500">
+                                        <div className="flex justify-center items-center gap-2">
+                                            <div className="w-5 h-5 border-2 border-[#042954] border-t-transparent rounded-full animate-spin"></div>
+                                            Chargement en cours...
+                                        </div>
                                     </td>
                                 </tr>
                             ) : paginatedFactures.length === 0 ? (
@@ -389,87 +389,148 @@ export default function AdminFacturesPage() {
                                 </tr>
                             ) : (
                                 paginatedFactures.map((facture) => (
-                                    <tr key={facture.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                                    <tr
+                                        key={facture.id}
+                                        className={`border-b border-gray-100 transition-colors ${isOverdue(facture) ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-gray-50/50'}`}
+                                    >
                                         <td className="p-4">
                                             <div className="flex items-center gap-2">
-                                                <FileText size={16} className="text-[#ffa000]"/>
+                                                <FileText size={16} className="text-[#ffa000]" />
                                                 <span className="font-bold text-[#333333] text-sm">{facture.numero}</span>
                                             </div>
                                         </td>
                                         <td className="p-4">
                                             <div className="font-semibold text-sm text-[#042954]">
-                                                {facture.etudiant?.nom} {facture.etudiant?.prenom}
+                                                {facture.etudiantNom} {facture.etudiantPrenom}
                                             </div>
                                         </td>
                                         <td className="p-4">
                                             <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-bold tracking-wide">
-                                                {facture.etudiant?.matricule || "-"}
+                                                {facture.etudiantMatricule || "-"}
                                             </span>
                                         </td>
-                                        <td className="p-4 text-sm text-gray-600">
-                                            {facture.type}
-                                        </td>
-                                        <td className="p-4 font-bold text-gray-800">
-                                            {formatMontant(facture.montant)}
-                                        </td>
-                                        <td className="p-4 text-sm text-gray-600">
-                                            {formatDate(facture.dateEcheance)}
-                                        </td>
+                                        <td className="p-4 text-sm text-gray-600">{facture.typeFacture || "-"}</td>
+                                        <td className="p-4 font-bold text-gray-800">{formatMontant(facture.montant)}</td>
+                                        <td className="p-4 text-sm text-gray-600">{formatDate(facture.dateEcheance)}</td>
+                                        <td className="p-4">{getStatutBadge(facture.statut)}</td>
+                                        <td className="p-4 text-sm text-gray-600">{formatDate(facture.datePaiement)}</td>
                                         <td className="p-4">
-                                            {getStatutBadge(facture.statut)}
-                                        </td>
-                                        <td className="p-4 text-sm text-gray-600">
-                                            {formatDate(facture.datePaiement)}
-                                        </td>
-                                        <td className="p-4 flex items-center justify-end gap-2">
-                                            {(facture.statut === 'NON_PAYEE' || facture.statut === 'EN_ATTENTE') && (
-                                                <>
-                                                    <button
-                                                        onClick={() => handleMarkAsPaid(facture.id)}
-                                                        className="p-2 text-green-600 bg-green-50 hover:bg-green-100 rounded transition-colors"
-                                                        title="Marquer Payée"
-                                                    >
-                                                        <CheckCircle size={16} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleCancel(facture.id)}
-                                                        className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-                                                        title="Annuler"
-                                                    >
-                                                        <XCircle size={16} />
-                                                    </button>
-                                                </>
-                                            )}
-                                            <button
-                                                onClick={() => facture.etudiant && handleExportPdfStudent(facture.etudiant.id, facture.etudiant.matricule)}
-                                                className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
-                                                title="PDF Étudiant"
-                                            >
-                                                <Download size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => openEditModal(facture)}
-                                                className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
-                                                title="Modifier"
-                                            >
-                                                <Edit2 size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(facture.id)}
-                                                className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors cursor-pointer"
-                                                title="Supprimer"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
+                                            <div className="flex items-center justify-end gap-2">
+                                                {(facture.statut === 'NON_PAYEE' || facture.statut === 'EN_ATTENTE') && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleMarkAsPaid(facture.id)}
+                                                            className="p-2 text-green-600 bg-green-50 hover:bg-green-100 rounded transition-colors"
+                                                            title="Marquer Payée"
+                                                        >
+                                                            <CheckCircle size={16} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleCancel(facture.id)}
+                                                            className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                                                            title="Annuler"
+                                                        >
+                                                            <XCircle size={16} />
+                                                        </button>
+                                                    </>
+                                                )}
+                                                <button
+                                                    onClick={() => handleExportPdfStudent(facture.etudiantId, facture.etudiantMatricule)}
+                                                    className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                                                    title="PDF Étudiant"
+                                                >
+                                                    <Download size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => openEditModal(facture)}
+                                                    className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                                                    title="Modifier"
+                                                >
+                                                    <Edit2 size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(facture.id)}
+                                                    className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors"
+                                                    title="Supprimer"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
                             )}
                         </tbody>
                     </table>
+
+                    {/* Mobile version (Cards) */}
+                    <div className="grid grid-cols-1 gap-4 p-4 md:hidden bg-gray-50/30">
+                        {isLoading ? (
+                            <div className="p-8 text-center text-gray-500 flex justify-center items-center gap-2">
+                                <div className="w-5 h-5 border-2 border-[#042954] border-t-transparent rounded-full animate-spin"></div>
+                                Chargement en cours...
+                            </div>
+                        ) : paginatedFactures.length === 0 ? (
+                            <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100">Aucune facture trouvée.</div>
+                        ) : (
+                            paginatedFactures.map((facture) => (
+                                <div key={facture.id} className={`bg-white p-4 rounded-xl shadow-sm relative flex flex-col gap-3 border transition-colors ${isOverdue(facture) ? 'border-red-200 bg-red-50/10' : 'border-gray-200'}`}>
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <FileText size={16} className="text-[#ffa000]" />
+                                                <span className="font-bold text-[#333333]">{facture.numero}</span>
+                                            </div>
+                                            <div className="font-semibold text-sm text-[#042954]">
+                                                {facture.etudiantNom} {facture.etudiantPrenom}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1">
+                                            {getStatutBadge(facture.statut)}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm">
+                                        <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
+                                            <span>Matricule: <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded ml-1">{facture.etudiantMatricule || "-"}</span></span>
+                                        </div>
+                                        <div className="flex justify-between items-center py-1 border-b border-gray-200">
+                                            <span className="text-gray-500">Type</span>
+                                            <span className="font-medium text-gray-700">{facture.typeFacture || "-"}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center py-1 border-b border-gray-200">
+                                            <span className="text-gray-500">Montant</span>
+                                            <span className="font-bold text-orange-600 text-base">{formatMontant(facture.montant)}</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 pt-1">
+                                            <div>
+                                                <span className="block text-xs text-gray-400">Échéance</span>
+                                                <span className={`font-medium ${isOverdue(facture) ? 'text-red-600' : 'text-gray-700'}`}>{formatDate(facture.dateEcheance)}</span>
+                                            </div>
+                                            <div>
+                                                <span className="block text-xs text-gray-400">Date paiement</span>
+                                                <span className="font-medium text-gray-700">{formatDate(facture.datePaiement)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-gray-100">
+                                        {(facture.statut === 'NON_PAYEE' || facture.statut === 'EN_ATTENTE') && (
+                                            <>
+                                                <button onClick={() => handleMarkAsPaid(facture.id)} className="p-2 text-green-600 bg-green-50 hover:bg-green-100 rounded" title="Marquer Payée"><CheckCircle size={16} /></button>
+                                                <button onClick={() => handleCancel(facture.id)} className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded" title="Annuler"><XCircle size={16} /></button>
+                                            </>
+                                        )}
+                                        <button onClick={() => handleExportPdfStudent(facture.etudiantId, facture.etudiantMatricule)} className="mr-auto px-3 py-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center gap-1 font-medium shadow-sm"><Download size={12} /> PDF</button>
+                                        <button onClick={() => openEditModal(facture)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded" title="Modifier"><Edit2 size={16} /></button>
+                                        <button onClick={() => handleDelete(facture.id)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded" title="Supprimer"><Trash2 size={16} /></button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
 
-                {/* Pagination */}
                 {!isLoading && filteredFactures.length > 0 && (
                     <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm">
                         <div className="flex items-center gap-3">
@@ -490,48 +551,19 @@ export default function AdminFacturesPage() {
                             </div>
                         </div>
                         <div className="flex items-center gap-1">
-                            <button
-                                disabled={currentPage === 1}
-                                onClick={() => setCurrentPage(1)}
-                                className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                            >
-                                <ChevronsLeft size={18} />
-                            </button>
-                            <button
-                                disabled={currentPage === 1}
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                            >
-                                <ChevronLeft size={18} />
-                            </button>
-                            
+                            <button disabled={currentPage === 1} onClick={() => setCurrentPage(1)} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 transition-colors"><ChevronsLeft size={18} /></button>
+                            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 transition-colors"><ChevronLeft size={18} /></button>
                             {Array.from({ length: totalPages }).map((_, i) => (
                                 <button
                                     key={i}
                                     onClick={() => setCurrentPage(i + 1)}
-                                    className={`w-8 h-8 rounded border transition-colors font-medium flex items-center justify-center ${currentPage === i + 1
-                                        ? 'bg-[#042954] text-white border-[#042954]'
-                                        : 'border-gray-300 text-gray-500 hover:bg-gray-50'
-                                        }`}
+                                    className={`w-8 h-8 rounded border transition-colors font-medium flex items-center justify-center ${currentPage === i + 1 ? 'bg-[#042954] text-white border-[#042954]' : 'border-gray-300 text-gray-500 hover:bg-gray-50'}`}
                                 >
                                     {i + 1}
                                 </button>
                             ))}
-
-                            <button
-                                disabled={currentPage === totalPages}
-                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                            >
-                                <ChevronRight size={18} />
-                            </button>
-                            <button
-                                disabled={currentPage === totalPages}
-                                onClick={() => setCurrentPage(totalPages)}
-                                className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                            >
-                                <ChevronsRight size={18} />
-                            </button>
+                            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 transition-colors"><ChevronRight size={18} /></button>
+                            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(totalPages)} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 transition-colors"><ChevronsRight size={18} /></button>
                         </div>
                     </div>
                 )}
@@ -549,9 +581,9 @@ export default function AdminFacturesPage() {
                         </div>
                         <form onSubmit={handleSubmitCreate} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Étudiant</label>
-                                <select 
-                                    required 
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Étudiant *</label>
+                                <select
+                                    required
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
                                     value={formData.etudiantId}
                                     onChange={e => setFormData({ ...formData, etudiantId: e.target.value })}
@@ -564,21 +596,22 @@ export default function AdminFacturesPage() {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Montant</label>
-                                    <input 
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Montant *</label>
+                                    <input
                                         type="number" step="0.01" min="0" required
+                                        placeholder="0.00"
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
                                         value={formData.montant}
                                         onChange={e => setFormData({ ...formData, montant: e.target.value })}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                                    <select 
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
+                                    <select
                                         required
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
-                                        value={formData.type}
-                                        onChange={e => setFormData({ ...formData, type: e.target.value })}
+                                        value={formData.typeFacture}
+                                        onChange={e => setFormData({ ...formData, typeFacture: e.target.value })}
                                     >
                                         <option value="SCOLARITE">Scolarité</option>
                                         <option value="INSCRIPTION">Inscription</option>
@@ -588,8 +621,8 @@ export default function AdminFacturesPage() {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Date Échéance</label>
-                                <input 
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Date Échéance *</label>
+                                <input
                                     type="date" required
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
                                     value={formData.dateEcheance}
@@ -598,27 +631,17 @@ export default function AdminFacturesPage() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Description (Optionnel)</label>
-                                <textarea 
+                                <textarea
                                     rows={3}
+                                    placeholder="Description optionnelle..."
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
                                     value={formData.description}
                                     onChange={e => setFormData({ ...formData, description: e.target.value })}
                                 />
                             </div>
                             <div className="flex justify-end gap-3 mt-6">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCreateModalOpen(false)}
-                                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition"
-                                >
-                                    Annuler
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-4 py-2 text-white bg-green-600 hover:bg-green-700 rounded-lg font-medium transition"
-                                >
-                                    Créer
-                                </button>
+                                <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition">Annuler</button>
+                                <button type="submit" className="px-4 py-2 text-white bg-[#FFA000] hover:bg-[#e69000] rounded-lg font-medium transition">Créer</button>
                             </div>
                         </form>
                     </div>
@@ -630,7 +653,7 @@ export default function AdminFacturesPage() {
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
                         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                            <h2 className="text-xl font-bold text-[#042954]">Modifier Facture {currentFacture.numero}</h2>
+                            <h2 className="text-xl font-bold text-[#042954]">Modifier — {currentFacture.numero}</h2>
                             <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition">
                                 <XCircle size={24} />
                             </button>
@@ -638,22 +661,14 @@ export default function AdminFacturesPage() {
                         <form onSubmit={handleSubmitEdit} className="p-6 space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Étudiant</label>
-                                <select 
-                                    required 
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
-                                    value={formData.etudiantId}
-                                    onChange={e => setFormData({ ...formData, etudiantId: e.target.value })}
-                                >
-                                    <option value="">Sélectionner un étudiant</option>
-                                    {etudiants.map(etud => (
-                                        <option key={etud.id} value={etud.id}>{etud.nom} {etud.prenom} - {etud.matricule}</option>
-                                    ))}
-                                </select>
+                                <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600 text-sm">
+                                    {currentFacture.etudiantNom} {currentFacture.etudiantPrenom} — {currentFacture.etudiantMatricule}
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Montant</label>
-                                    <input 
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Montant *</label>
+                                    <input
                                         type="number" step="0.01" min="0" required
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
                                         value={formData.montant}
@@ -661,12 +676,12 @@ export default function AdminFacturesPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                                    <select 
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
+                                    <select
                                         required
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
-                                        value={formData.type}
-                                        onChange={e => setFormData({ ...formData, type: e.target.value })}
+                                        value={formData.typeFacture}
+                                        onChange={e => setFormData({ ...formData, typeFacture: e.target.value })}
                                     >
                                         <option value="SCOLARITE">Scolarité</option>
                                         <option value="INSCRIPTION">Inscription</option>
@@ -676,8 +691,8 @@ export default function AdminFacturesPage() {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Date Échéance</label>
-                                <input 
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Date Échéance *</label>
+                                <input
                                     type="date" required
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
                                     value={formData.dateEcheance}
@@ -686,7 +701,7 @@ export default function AdminFacturesPage() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Description (Optionnel)</label>
-                                <textarea 
+                                <textarea
                                     rows={3}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
                                     value={formData.description}
@@ -694,24 +709,13 @@ export default function AdminFacturesPage() {
                                 />
                             </div>
                             <div className="flex justify-end gap-3 mt-6">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEditModalOpen(false)}
-                                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition"
-                                >
-                                    Annuler
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-4 py-2 text-white bg-[#042954] hover:bg-[#031d3d] rounded-lg font-medium transition"
-                                >
-                                    Enregistrer
-                                </button>
+                                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition">Annuler</button>
+                                <button type="submit" className="px-4 py-2 text-white bg-[#042954] hover:bg-[#031d3d] rounded-lg font-medium transition">Enregistrer</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
         </div>
-    );
+    )
 }

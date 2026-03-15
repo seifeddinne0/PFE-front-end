@@ -25,7 +25,9 @@ export const api = {
         });
 
         if (!res.ok) {
-            throw new Error("Erreur lors de la récupération des données");
+            const errorMsg = `Erreur API (${res.status}) sur ${endpoint}`;
+            console.error(errorMsg);
+            throw new Error(errorMsg);
         }
 
         return res.json();

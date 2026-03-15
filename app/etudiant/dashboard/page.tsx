@@ -2,8 +2,26 @@
 
 import { BookOpen, Calendar, FileText, Bell, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 
 export default function EtudiantDashboardPage() {
+    const [stats, setStats] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const data = await api.get("/api/etudiant/dashboard");
+                setStats(data);
+            } catch (error) {
+                console.error("Erreur dashboard étudiant", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchStats();
+    }, []);
     return (
         <div className="animate-in fade-in space-y-8">
             {/* Welcome Banner */}
@@ -13,7 +31,7 @@ export default function EtudiantDashboardPage() {
 
                 <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
-                        <h2 className="text-3xl font-extrabold mb-2">Bienvenue sur votre espace ! 👋</h2>
+                        <h2 className="text-3xl font-extrabold mb-2">Bienvenue {stats?.prenom || "sur votre espace"} ! 👋</h2>
                         <p className="text-white/80 max-w-xl">
                             Ceci est votre tableau de bord principal. Vous pouvez retrouver ici un aperçu de vos cours, de votre emploi du temps et de vos absences.
                         </p>
@@ -32,7 +50,7 @@ export default function EtudiantDashboardPage() {
                         <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><BookOpen size={18} /></div>
                     </div>
                     <div className="flex items-end gap-3">
-                        <span className="text-3xl font-extrabold text-[#042954]">8</span>
+                        <span className="text-3xl font-extrabold text-[#042954]">{stats?.totalMatieres || 0}</span>
                         <span className="text-sm text-gray-400 font-medium mb-1">Matières</span>
                     </div>
                 </div>
@@ -43,19 +61,19 @@ export default function EtudiantDashboardPage() {
                         <div className="p-2 bg-orange-50 text-orange-600 rounded-lg"><AlertTriangle size={18} /></div>
                     </div>
                     <div className="flex items-end gap-3">
-                        <span className="text-3xl font-extrabold text-[#042954]">3</span>
-                        <span className="text-sm text-gray-400 font-medium mb-1">Heures</span>
+                        <span className="text-3xl font-extrabold text-[#042954]">{stats?.totalAbsences || 0}</span>
+                        <span className="text-sm text-gray-400 font-medium mb-1">Séances</span>
                     </div>
                 </div>
 
                 <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-gray-500 text-sm font-medium">Prochain Cours</h3>
-                        <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><Calendar size={18} /></div>
+                        <h3 className="text-gray-500 text-sm font-medium">Total Évaluations</h3>
+                        <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><FileText size={18} /></div>
                     </div>
                     <div className="flex items-end gap-3">
-                        <span className="text-3xl font-extrabold text-[#042954]">10h30</span>
-                        <span className="text-sm text-purple-500 font-medium mb-1">Salle B12</span>
+                        <span className="text-3xl font-extrabold text-[#042954]">{stats?.totalEvaluations || 0}</span>
+                        <span className="text-sm text-purple-500 font-medium mb-1">Notes reçues</span>
                     </div>
                 </div>
             </div>

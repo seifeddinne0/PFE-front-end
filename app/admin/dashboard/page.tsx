@@ -7,15 +7,21 @@ import { api } from "@/lib/api";
 
 export default function AdminDashboardPage() {
     const [userEmail, setUserEmail] = useState("admin@institut.edu");
+    const [stats, setStats] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                // Fetch email & possible dynamic stats
-                const data = await api.get("/api/admin/dashboard");
-                if (data && data.email) {
-                    setUserEmail(data.email);
+                const [dashData, statsData] = await Promise.all([
+                    api.get("/api/admin/dashboard"),
+                    api.get("/api/admin/statistiques/dashboard")
+                ]);
+                if (dashData && dashData.email) {
+                    setUserEmail(dashData.email);
+                }
+                if (statsData) {
+                    setStats(statsData);
                 }
             } catch (error) {
                 console.error("Erreur lors de la récupération des données du dashboard", error);
@@ -53,8 +59,8 @@ export default function AdminDashboardPage() {
                         <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Users size={18} /></div>
                     </div>
                     <div className="flex items-end gap-3">
-                        <span className="text-3xl font-extrabold text-[#042954]">1,248</span>
-                        <span className="text-sm text-[#4caf50] font-medium mb-1">+5%</span>
+                        <span className="text-3xl font-extrabold text-[#042954]">{stats?.totalEtudiants || 0}</span>
+                        <span className="text-sm text-[#4caf50] font-medium mb-1">{stats?.etudiantsActifs || 0} Actifs</span>
                     </div>
                 </div>
 
@@ -64,30 +70,30 @@ export default function AdminDashboardPage() {
                         <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><Users size={18} /></div>
                     </div>
                     <div className="flex items-end gap-3">
-                        <span className="text-3xl font-extrabold text-[#042954]">42</span>
-                        <span className="text-sm text-[#4caf50] font-medium mb-1">+2%</span>
+                        <span className="text-3xl font-extrabold text-[#042954]">{stats?.totalEnseignants || 0}</span>
+                        <span className="text-sm text-gray-400 font-medium mb-1">Inscrits</span>
                     </div>
                 </div>
 
                 <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-gray-500 text-sm font-medium">Total Classes</h3>
-                        <div className="p-2 bg-orange-50 text-orange-600 rounded-lg"><LayoutDashboard size={18} /></div>
+                        <h3 className="text-gray-500 text-sm font-medium">Total Documents</h3>
+                        <div className="p-2 bg-orange-50 text-orange-600 rounded-lg"><BookOpen size={18} /></div>
                     </div>
                     <div className="flex items-end gap-3">
-                        <span className="text-3xl font-extrabold text-[#042954]">15</span>
-                        <span className="text-sm text-gray-400 font-medium mb-1">Actives</span>
+                        <span className="text-3xl font-extrabold text-[#042954]">{stats?.totalDocuments || 0}</span>
+                        <span className="text-sm text-orange-500 font-medium mb-1">{stats?.documentsEnAttente || 0} En attente</span>
                     </div>
                 </div>
 
                 <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-gray-500 text-sm font-medium">Total Matières</h3>
-                        <div className="p-2 bg-green-50 text-green-600 rounded-lg"><BookOpen size={18} /></div>
+                        <h3 className="text-gray-500 text-sm font-medium">Total Absences</h3>
+                        <div className="p-2 bg-green-50 text-green-600 rounded-lg"><Calendar size={18} /></div>
                     </div>
                     <div className="flex items-end gap-3">
-                        <span className="text-3xl font-extrabold text-[#042954]">34</span>
-                        <span className="text-sm text-[#4caf50] font-medium mb-1">Assignées</span>
+                        <span className="text-3xl font-extrabold text-[#042954]">{stats?.totalAbsences || 0}</span>
+                        <span className="text-sm text-[#4caf50] font-medium mb-1">Enregistrées</span>
                     </div>
                 </div>
             </div>

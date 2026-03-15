@@ -2,8 +2,26 @@
 
 import { BookOpen, Calendar, FileText, Bell, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 
 export default function EnseignantDashboardPage() {
+    const [stats, setStats] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const data = await api.get("/api/enseignant/dashboard");
+                setStats(data);
+            } catch (error) {
+                console.error("Erreur dashboard enseignant", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchStats();
+    }, []);
     return (
         <div className="animate-in fade-in space-y-8">
             {/* Welcome Banner */}
@@ -13,7 +31,7 @@ export default function EnseignantDashboardPage() {
 
                 <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
-                        <h2 className="text-3xl font-extrabold mb-2">Bienvenue sur votre espace ! 👋</h2>
+                        <h2 className="text-3xl font-extrabold mb-2">Bienvenue {stats?.prenom || "sur votre espace"} ! 👋</h2>
                         <p className="text-white/80 max-w-xl">
                             Ceci est votre tableau de bord principal. Vous pouvez retrouver ici un aperçu de vos activités récentes, vos cours et vos notifications.
                         </p>
@@ -32,8 +50,8 @@ export default function EnseignantDashboardPage() {
                         <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><BookOpen size={18} /></div>
                     </div>
                     <div className="flex items-end gap-3">
-                        <span className="text-3xl font-extrabold text-[#042954]">12</span>
-                        <span className="text-sm text-gray-400 font-medium mb-1">Inscrits</span>
+                        <span className="text-3xl font-extrabold text-[#042954]">{stats?.totalMatieres || 0}</span>
+                        <span className="text-sm text-gray-400 font-medium mb-1">Matières</span>
                     </div>
                 </div>
 
@@ -43,8 +61,8 @@ export default function EnseignantDashboardPage() {
                         <div className="p-2 bg-green-50 text-green-600 rounded-lg"><FileText size={18} /></div>
                     </div>
                     <div className="flex items-end gap-3">
-                        <span className="text-3xl font-extrabold text-[#042954]">142</span>
-                        <span className="text-sm text-gray-400 font-medium mb-1">Effectuées</span>
+                        <span className="text-3xl font-extrabold text-[#042954]">{stats?.notesSaisies || 0}</span>
+                        <span className="text-sm text-gray-400 font-medium mb-1">Évaluations</span>
                     </div>
                 </div>
 
@@ -54,8 +72,8 @@ export default function EnseignantDashboardPage() {
                         <div className="p-2 bg-orange-50 text-orange-600 rounded-lg"><AlertTriangle size={18} /></div>
                     </div>
                     <div className="flex items-end gap-3">
-                        <span className="text-3xl font-extrabold text-[#042954]">38</span>
-                        <span className="text-sm text-orange-500 font-medium mb-1">Ce mois</span>
+                        <span className="text-3xl font-extrabold text-[#042954]">{stats?.absencesRenseignees || 0}</span>
+                        <span className="text-sm text-orange-500 font-medium mb-1">Total</span>
                     </div>
                 </div>
 

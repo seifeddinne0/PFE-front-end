@@ -16,6 +16,7 @@ interface Enseignant {
     specialite: string;
     grade: string;
     statut: string;
+    photo?: string;
 }
 
 export default function EnseignantsListPage() {
@@ -121,10 +122,11 @@ export default function EnseignantsListPage() {
 
             {/* Table */}
             <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse hidden md:table">
                     <thead>
                         <tr className="bg-gray-50 text-gray-500 border-b border-gray-200 text-sm">
                             <th className="p-4 font-semibold text-center w-16">#</th>
+                            <th className="p-4 font-semibold w-16 text-center">Photo</th>
                             <th className="p-4 font-semibold">Matricule</th>
                             <th className="p-4 font-semibold">Nom & Prénom</th>
                             <th className="p-4 font-semibold">Email</th>
@@ -150,7 +152,25 @@ export default function EnseignantsListPage() {
                                     <td className="p-4 text-center text-sm text-gray-400 font-medium">
                                         {(currentPage - 1) * itemsPerPage + index + 1}
                                     </td>
-                                    <td className="p-4">
+                                    <td className="p-4 text-center">
+                                        <div className="flex justify-center">
+                                            {enseignant.photo ? (
+                                                <img
+                                                    src={`http://localhost:8080${enseignant.photo.startsWith('/') ? '' : '/'}${enseignant.photo}`}
+                                                    alt={`${enseignant.nom} ${enseignant.prenom}`}
+                                                    className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${enseignant.nom}+${enseignant.prenom}&background=042954&color=fff`;
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-full bg-[#042954] text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                                                    {enseignant.nom?.charAt(0)}{enseignant.prenom?.charAt(0)}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-center font-medium">
                                         <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-bold tracking-wide">
                                             {enseignant.matricule || "N/A"}
                                         </span>
@@ -199,6 +219,64 @@ export default function EnseignantsListPage() {
                         )}
                     </tbody>
                 </table>
+                
+                {/* Mobile version (Cards) */}
+                <div className="grid grid-cols-1 gap-4 p-4 md:hidden bg-gray-50/30">
+                    {isLoading ? (
+                        <div className="p-8 text-center text-gray-500">Chargement en cours...</div>
+                    ) : paginatedEnseignants.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100">Aucun enseignant trouvé.</div>
+                    ) : (
+                        paginatedEnseignants.map((enseignant, index) => (
+                            <div key={enseignant.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative flex flex-col gap-3">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex items-center gap-3">
+                                        {enseignant.photo ? (
+                                            <img
+                                                src={`http://localhost:8080${enseignant.photo.startsWith('/') ? '' : '/'}${enseignant.photo}`}
+                                                alt={`${enseignant.nom} ${enseignant.prenom}`}
+                                                className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-md"
+                                                onError={(e) => {
+                                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${enseignant.nom}+${enseignant.prenom}&background=042954&color=fff`;
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="w-12 h-12 rounded-full bg-[#042954] text-white flex items-center justify-center font-bold text-sm shadow-md">
+                                                {enseignant.nom?.charAt(0)}{enseignant.prenom?.charAt(0)}
+                                            </div>
+                                        )}
+                                        <div>
+                                            <div className="font-bold text-[#333333] text-lg leading-tight">{enseignant.nom} {enseignant.prenom}</div>
+                                            <div className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded inline-block mt-1">{enseignant.matricule || "N/A"}</div>
+                                        </div>
+                                    </div>
+                                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${enseignant.statut === 'Actif' || enseignant.statut === undefined ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                        {enseignant.statut || "Actif"}
+                                    </span>
+                                </div>
+
+                                <div className="space-y-1 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                    <div className="grid grid-cols-2 gap-2 mb-2">
+                                        <div><span className="block text-xs text-gray-400">Spécialité</span><span className="font-medium">{enseignant.specialite || "-"}</span></div>
+                                        <div><span className="block text-xs text-gray-400">Grade</span><span className="font-medium">{enseignant.grade || "-"}</span></div>
+                                    </div>
+                                    <div className="flex justify-between border-t border-gray-200 pt-2">
+                                        <span className="text-gray-400">Contact</span>
+                                        <div className="text-right">
+                                            <div className="truncate max-w-[150px]" title={enseignant.email}>{enseignant.email || "-"}</div>
+                                            <div>{enseignant.telephone || "-"}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                                    <Link href={`/admin/enseignants/${enseignant.id}/edit`} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded" title="Modifier"><Edit2 size={16} /></Link>
+                                    <button onClick={() => handleDelete(enseignant.id)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded" title="Supprimer"><Trash2 size={16} /></button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
             </div>
 
             {/* Pagination */}
