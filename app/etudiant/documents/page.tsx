@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Download, FileText, FileBadge, CheckCircle, Clock, Send, ChevronRight, Briefcase, GraduationCap, XCircle, Building2, UserCircle2, Filter, Check } from "lucide-react";
+import { Plus, Download, FileText, FileBadge, CheckCircle, Clock, Send, ChevronRight, Briefcase, GraduationCap, XCircle, Building2, UserCircle2, Filter, Check } from "lucide-react";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
 
@@ -12,8 +12,8 @@ interface Enseignant {
 }
 
 interface Validateur {
-    enseignantNom: string;
-    enseignantPrenom: string;
+    nom: string;
+    prenom: string;
     statut: string;
 }
 
@@ -99,8 +99,8 @@ export default function EtudiantDocumentsPage() {
 
     const fetchEnseignants = async () => {
         try {
-            // L'étudiant peut avoir besoin de fetch les enseignants pour l'attestation de présence
-            const data = await api.get("/api/admin/enseignants"); // L'utilisateur a mentionné /api/admin/enseignants
+            // Récupérer uniquement les enseignants qui enseignent à l'étudiant connecté
+            const data = await api.get("/api/etudiant/enseignants");
             if (Array.isArray(data)) {
                 setEnseignants(data);
             } else if (data && Array.isArray(data.content)) {
@@ -126,25 +126,6 @@ export default function EtudiantDocumentsPage() {
         }
         loadData();
     }, []);
-
-    const handleCancelDocument = async (id: number) => {
-        if (!window.confirm("Êtes-vous sûr de vouloir annuler cette demande ?")) return;
-        try {
-            // La demande indique PUT, DELETE ou PATCH selon l'API. Vous avez demandé "DELETE /api/admin/documents/{id}"
-            await api.delete(`/api/admin/documents/${id}`);
-            toast.success("Demande annulée avec succès!");
-            loadData();
-        } catch (error: any) {
-            // Repli vers l'API etudiant si admin echoue
-            try {
-                await api.delete(`/api/etudiant/documents/${id}`);
-                toast.success("Demande annulée avec succès!");
-                loadData();
-            } catch (fallbackError: any) {
-                toast.error(error.message || "Erreur de suppression.");
-            }
-        }
-    };
 
     const handleDownloadPdf = async (id: number, filename: string) => {
         try {
@@ -206,12 +187,15 @@ export default function EtudiantDocumentsPage() {
                 return;
             }
 
-            const payload: any = { type: selectedType, motif };
+            const payload: any = {
+                typeDocument: selectedType,
+                motif: motif?.trim() || "",
+            };
 
             if (selectedType === "ATTESTATION_PRESENCE") {
-                payload.enseignantsIds = selectedEnseignants;
+                payload.validateursIds = selectedEnseignants;
             } else if (selectedType === "DEMANDE_STAGE" || selectedType === "VALIDATION_STAGE") {
-                payload.nomEntreprise = nomEntreprise;
+                payload.nomEntrepriseStage = nomEntreprise;
                 payload.adresseEntreprise = adresseEntreprise;
                 payload.nomEncadrant = nomEncadrant;
             }
@@ -246,6 +230,19 @@ export default function EtudiantDocumentsPage() {
         }
     };
 
+    const getValidateurAction = (statut?: string) => {
+        const normalized = (statut || "").toUpperCase();
+        if (normalized === "VALIDE" || normalized === "VALIDEE") {
+            return { label: "A validé", dotClass: "text-green-600", textClass: "text-green-700 dark:text-green-400" };
+        }
+        if (normalized === "REJETE" || normalized === "REJETEE") {
+            return { label: "A rejeté", dotClass: "text-red-600", textClass: "text-red-700 dark:text-red-400" };
+        }
+        return { label: "En attente", dotClass: "text-orange-600", textClass: "text-orange-700 dark:text-orange-400" };
+    };
+
+    const isPresenceAttestation = (typeDocument?: string) => typeDocument === "ATTESTATION_PRESENCE";
+
     const getFilteredDocuments = () => {
         return documents.filter(d => {
             if (statutFilter === "Tous") return true;
@@ -257,7 +254,7 @@ export default function EtudiantDocumentsPage() {
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <h1 className="text-2xl font-bold text-[#042954]">Mes Documents</h1>
+                <h1 className="text-2xl font-bold text-[#042954] dark:text-white">Mes Documents</h1>
                 <button
                     onClick={openCreateModal}
                     className="bg-[#ffa000] hover:bg-[#e69000] text-white font-semibold py-2 px-6 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm whitespace-nowrap"
@@ -269,61 +266,59 @@ export default function EtudiantDocumentsPage() {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm flex items-center justify-between">
+                <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-gray-500 text-sm font-medium">En Attente</p>
-                        <h3 className="text-2xl font-bold text-orange-600 mt-1">{stats.enAttente}</h3>
+                        <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">En Attente</p>
+                        <h3 className="text-2xl font-bold text-orange-600 dark:text-orange-300 mt-1">{stats.enAttente}</h3>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-600">
+                    <div className="w-10 h-10 rounded-full bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center text-orange-600 dark:text-orange-300">
                         <Clock size={20} />
                     </div>
                 </div>
-                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm flex items-center justify-between">
+                <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-gray-500 text-sm font-medium leading-tight">En cours</p>
-                        <h3 className="text-2xl font-bold text-blue-600 mt-1">{stats.enCoursValidation}</h3>
+                        <p className="text-gray-500 dark:text-slate-400 text-sm font-medium leading-tight">En cours</p>
+                        <h3 className="text-2xl font-bold text-blue-600 dark:text-blue-300 mt-1">{stats.enCoursValidation}</h3>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                    <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-300">
                         <FileText size={20} />
                     </div>
                 </div>
-                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm flex items-center justify-between">
+                <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-gray-500 text-sm font-medium">Validées</p>
-                        <h3 className="text-2xl font-bold text-green-600 mt-1">{stats.validees}</h3>
+                        <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">Validées</p>
+                        <h3 className="text-2xl font-bold text-green-600 dark:text-green-300 mt-1">{stats.validees}</h3>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600">
+                    <div className="w-10 h-10 rounded-full bg-green-50 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-300">
                         <CheckCircle size={20} />
                     </div>
                 </div>
-                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm flex items-center justify-between">
+                <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-gray-500 text-sm font-medium">Envoyées</p>
-                        <h3 className="text-2xl font-bold text-gray-600 mt-1">{stats.envoyees}</h3>
+                        <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">Envoyées</p>
+                        <h3 className="text-2xl font-bold text-gray-600 dark:text-slate-200 mt-1">{stats.envoyees}</h3>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-600">
+                    <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-700/60 flex items-center justify-center text-gray-600 dark:text-slate-200">
                         <Send size={20} />
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <h2 className="text-xl font-bold text-[#042954]">Historique des Demandes</h2>
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700/50 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-100 dark:border-slate-700/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <h2 className="text-xl font-bold text-[#042954] dark:text-white">Historique des Demandes</h2>
                     
                     <div className="flex items-center gap-2">
-                        <Filter size={18} className="text-gray-400" />
+                        <Filter size={18} className="text-gray-400 dark:text-slate-500" />
                         <select 
                             value={statutFilter}
                             onChange={(e) => setStatutFilter(e.target.value)}
-                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ffa000] bg-gray-50"
+                            className="border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ffa000] bg-gray-50 dark:bg-slate-800/50"
                         >
                             <option value="Tous">Tous les statuts</option>
                             <option value="EN_ATTENTE">En Attente</option>
-                            <option value="EN_COURS_VALIDATION">En Cours Validation</option>
                             <option value="VALIDEE">Validée</option>
                             <option value="REJETEE">Rejetée</option>
-                            <option value="ENVOYEE">Envoyée</option>
                         </select>
                     </div>
                 </div>
@@ -331,32 +326,32 @@ export default function EtudiantDocumentsPage() {
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse hidden md:table">
                         <thead>
-                            <tr className="bg-gray-50 text-gray-500 border-b border-gray-200 text-sm">
+                            <tr className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 border-b border-gray-200 dark:border-slate-700/50 text-sm">
                                 <th className="p-4 font-semibold">Type Document</th>
                                 <th className="p-4 font-semibold">Statut</th>
                                 <th className="p-4 font-semibold max-w-[200px]">Motif / Détails</th>
                                 <th className="p-4 font-semibold">Validateurs</th>
                                 <th className="p-4 font-semibold">Date</th>
-                                <th className="p-4 font-semibold text-right">Actions</th>
+                                <th className="p-4 font-semibold text-right">Téléchargement</th>
                             </tr>
                         </thead>
                         <tbody>
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={6} className="p-8 text-center text-gray-500 flex justify-center items-center gap-2">
+                                    <td colSpan={6} className="p-8 text-center text-gray-500 dark:text-slate-400 flex justify-center items-center gap-2">
                                         <div className="w-5 h-5 border-2 border-[#042954] border-t-transparent rounded-full animate-spin"></div>
                                         Chargement en cours...
                                     </td>
                                 </tr>
                             ) : filteredDocuments.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="p-8 text-center text-gray-500">Aucune demande trouvée avec ce filtre.</td>
+                                    <td colSpan={6} className="p-8 text-center text-gray-500 dark:text-slate-400">Aucune demande trouvée avec ce filtre.</td>
                                 </tr>
                             ) : (
                                 filteredDocuments.map((doc) => (
-                                    <tr key={doc.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                                    <tr key={doc.id} className="border-b border-gray-100 dark:border-slate-700 hover:bg-gray-50/50 dark:bg-slate-800/50 transition-colors">
                                         <td className="p-4">
-                                            <div className="font-semibold text-sm text-[#042954] flex items-center gap-2">
+                                            <div className="font-semibold text-sm text-[#042954] dark:text-white flex items-center gap-2">
                                                 <FileText size={16} className="text-[#ffa000]" />
                                                 {getTypeLabel(doc.typeDocument)}
                                             </div>
@@ -364,46 +359,43 @@ export default function EtudiantDocumentsPage() {
                                         <td className="p-4">
                                             {getStatutBadge(doc.statut)}
                                         </td>
-                                        <td className="p-4 text-sm text-gray-600 max-w-[200px] truncate" title={doc.motif}>
+                                        <td className="p-4 text-sm text-gray-600 dark:text-slate-300 max-w-[200px] truncate" title={doc.motif}>
                                             {doc.motif || "-"}
                                         </td>
-                                        <td className="p-4 text-xs text-gray-600">
-                                            {doc.typeDocument === "ATTESTATION_PRESENCE" && doc.validateurs && doc.validateurs.length > 0 ? (
+                                        <td className="p-4 text-xs text-gray-600 dark:text-slate-300">
+                                            {isPresenceAttestation(doc.typeDocument) ? (
+                                                doc.validateurs && doc.validateurs.length > 0 ? (
                                                 <ul className="space-y-1">
                                                     {doc.validateurs.map((v, idx) => (
                                                         <li key={idx} className="flex items-center gap-1">
-                                                            <span className={
-                                                                v.statut === "VALIDEE" ? "text-green-600 font-bold" :
-                                                                v.statut === "REJETEE" ? "text-red-600 font-bold" :
-                                                                "text-orange-600"
-                                                            }>•</span>
-                                                            {v.enseignantPrenom} {v.enseignantNom}
+                                                            <span className={`${getValidateurAction(v.statut).dotClass} font-bold`}>•</span>
+                                                            <span>{v.prenom} {v.nom}</span>
+                                                            <span className={`${getValidateurAction(v.statut).textClass} font-semibold`}>
+                                                                ({getValidateurAction(v.statut).label})
+                                                            </span>
                                                         </li>
                                                     ))}
                                                 </ul>
+                                                ) : (
+                                                    <span className="text-gray-400 dark:text-slate-500">-</span>
+                                                )
                                             ) : (
-                                                <span className="text-gray-400">-</span>
+                                                <span className="font-medium text-blue-700 dark:text-blue-400">Administration</span>
                                             )}
                                         </td>
-                                        <td className="p-4 text-sm text-gray-600">
+                                        <td className="p-4 text-sm text-gray-600 dark:text-slate-300">
                                             {formatDate(doc.createdAt)}
                                         </td>
                                         <td className="p-4 flex items-center justify-end gap-2">
-                                            {(doc.statut === 'VALIDEE' || doc.statut === 'ENVOYEE') && (
+                                            {doc.statut === 'VALIDEE' ? (
                                                 <button
                                                     onClick={() => handleDownloadPdf(doc.id, `${doc.typeDocument}_${doc.id}.pdf`)}
                                                     className="px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center gap-1 font-medium shadow-sm"
                                                 >
                                                     <Download size={14} /> Télécharger PDF
                                                 </button>
-                                            )}
-                                            {doc.statut === 'EN_ATTENTE' && (
-                                                <button
-                                                    onClick={() => handleCancelDocument(doc.id)}
-                                                    className="px-3 py-1.5 text-sm text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors flex items-center gap-1 font-medium shadow-sm ml-1"
-                                                >
-                                                    <Trash2 size={14} /> Annuler
-                                                </button>
+                                            ) : (
+                                                <span className="text-xs text-gray-400 dark:text-slate-500">-</span>
                                             )}
                                         </td>
                                     </tr>
@@ -413,74 +405,74 @@ export default function EtudiantDocumentsPage() {
                     </table>
 
                     {/* Mobile version (Cards) */}
-                    <div className="grid grid-cols-1 gap-4 p-4 md:hidden bg-gray-50/30">
+                    <div className="grid grid-cols-1 gap-4 p-4 md:hidden bg-gray-50 dark:bg-slate-800/50/30">
                         {isLoading ? (
-                            <div className="p-8 text-center text-gray-500 flex justify-center items-center gap-2">
+                            <div className="p-8 text-center text-gray-500 dark:text-slate-400 flex justify-center items-center gap-2">
                                 <div className="w-5 h-5 border-2 border-[#042954] border-t-transparent rounded-full animate-spin"></div>
                                 Chargement en cours...
                             </div>
                         ) : filteredDocuments.length === 0 ? (
-                            <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100">Aucune demande trouvée avec ce filtre.</div>
+                            <div className="p-8 text-center text-gray-500 dark:text-slate-400 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700">Aucune demande trouvée avec ce filtre.</div>
                         ) : (
                             filteredDocuments.map((doc) => (
-                                <div key={doc.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 relative flex flex-col gap-3">
+                                <div key={doc.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 relative flex flex-col gap-3">
                                     <div className="flex justify-between items-start mb-2">
                                         <div className="flex items-center gap-2 pr-4">
                                             <FileText size={20} className="text-[#ffa000] flex-shrink-0" />
-                                            <span className="font-bold text-[#333333] text-base leading-tight">{getTypeLabel(doc.typeDocument)}</span>
+                                            <span className="font-bold text-[#333333] dark:text-slate-100 text-base leading-tight">{getTypeLabel(doc.typeDocument)}</span>
                                         </div>
                                         <div className="flex-shrink-0">
                                             {getStatutBadge(doc.statut)}
                                         </div>
                                     </div>
                                     
-                                    <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm">
-                                        <div className="flex justify-between items-center py-1 border-b border-gray-200">
-                                            <span className="text-gray-500">Date</span>
+                                    <div className="space-y-2 bg-gray-50 dark:bg-slate-800/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700 text-sm">
+                                        <div className="flex justify-between items-center py-1 border-b border-gray-200 dark:border-slate-700">
+                                            <span className="text-gray-500 dark:text-slate-400">Date</span>
                                             <span className="font-medium text-gray-700">{formatDate(doc.createdAt)}</span>
                                         </div>
                                         
-                                        {doc.typeDocument === "ATTESTATION_PRESENCE" && doc.validateurs && doc.validateurs.length > 0 && (
-                                            <div className="py-1 border-b border-gray-200">
-                                                <span className="text-gray-500 block mb-1">Validateurs</span>
-                                                <ul className="space-y-1 text-xs">
-                                                    {doc.validateurs.map((v, idx) => (
-                                                        <li key={idx} className="flex items-center gap-1">
-                                                            <span className={
-                                                                v.statut === "VALIDEE" ? "text-green-600 font-bold" :
-                                                                v.statut === "REJETEE" ? "text-red-600 font-bold" :
-                                                                "text-orange-600"
-                                                            }>•</span>
-                                                            {v.enseignantPrenom} {v.enseignantNom}
-                                                        </li>
-                                                    ))}
-                                                </ul>
+                                        {isPresenceAttestation(doc.typeDocument) ? (
+                                            <div className="py-1 border-b border-gray-200 dark:border-slate-700">
+                                                <span className="text-gray-500 dark:text-slate-400 block mb-1">Validateurs</span>
+                                                {doc.validateurs && doc.validateurs.length > 0 ? (
+                                                    <ul className="space-y-1 text-xs">
+                                                        {doc.validateurs.map((v, idx) => (
+                                                            <li key={idx} className="flex items-center gap-1">
+                                                                <span className={`${getValidateurAction(v.statut).dotClass} font-bold`}>•</span>
+                                                                <span>{v.prenom} {v.nom}</span>
+                                                                <span className={`${getValidateurAction(v.statut).textClass} font-semibold`}>
+                                                                    ({getValidateurAction(v.statut).label})
+                                                                </span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400 dark:text-slate-500">-</span>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="py-1 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center">
+                                                <span className="text-gray-500 dark:text-slate-400">Validateur</span>
+                                                <span className="font-semibold text-blue-700 dark:text-blue-400">Administration</span>
                                             </div>
                                         )}
                                         
                                         <div>
-                                            <span className="block text-gray-500 text-xs mb-1">Motif / Détails</span>
+                                            <span className="block text-gray-500 dark:text-slate-400 text-xs mb-1">Motif / Détails</span>
                                             <div className="bg-gray-100 p-2 rounded text-xs text-gray-700 break-words">
                                                 {doc.motif || "Aucun motif précisé"}
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-                                        {(doc.statut === 'VALIDEE' || doc.statut === 'ENVOYEE') && (
+                                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-slate-700">
+                                        {doc.statut === 'VALIDEE' && (
                                             <button
                                                 onClick={() => handleDownloadPdf(doc.id, `${doc.typeDocument}_${doc.id}.pdf`)}
                                                 className="flex-1 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center justify-center gap-1 font-medium shadow-sm"
                                             >
                                                 <Download size={16} /> PDF
-                                            </button>
-                                        )}
-                                        {doc.statut === 'EN_ATTENTE' && (
-                                            <button
-                                                onClick={() => handleCancelDocument(doc.id)}
-                                                className="flex-1 py-2 text-sm text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors flex items-center justify-center gap-1 font-medium shadow-sm"
-                                            >
-                                                <Trash2 size={16} /> Annuler
                                             </button>
                                         )}
                                     </div>
@@ -494,8 +486,8 @@ export default function EtudiantDocumentsPage() {
             {/* Create Modal */}
             {isCreateModalOpen && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
-                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-[#042954] text-white">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="p-6 border-b border-gray-100 dark:border-slate-700/50 flex justify-between items-center bg-[#042954] text-white">
                             <h2 className="text-xl font-bold flex items-center gap-2">
                                 {createStep === 1 ? "Choisir le type de document" : "Détails de la demande"}
                             </h2>
@@ -504,21 +496,21 @@ export default function EtudiantDocumentsPage() {
                             </button>
                         </div>
                         
-                        <div className="overflow-y-auto p-6 flex-grow bg-gray-50/50">
+                        <div className="overflow-y-auto p-6 flex-grow bg-gray-50/50 dark:bg-slate-800/50">
                             {createStep === 1 && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {DOCUMENT_TYPES.map(type => (
                                         <div 
                                             key={type.id}
                                             onClick={() => handleNextStep(type.id)}
-                                            className="bg-white border-2 border-transparent hover:border-[#ffa000] p-5 rounded-xl cursor-pointer shadow-sm hover:shadow-md transition-all group flex items-start gap-4"
+                                            className="bg-white dark:bg-slate-800 border-2 border-transparent hover:border-[#ffa000] p-5 rounded-xl cursor-pointer shadow-sm hover:shadow-md transition-all group flex items-start gap-4"
                                         >
-                                            <div className="text-[#042954] group-hover:text-[#ffa000] transition-colors p-3 bg-blue-50 group-hover:bg-orange-50 rounded-lg">
+                                            <div className="text-[#042954] dark:text-white group-hover:text-[#ffa000] transition-colors p-3 bg-blue-50 group-hover:bg-orange-50 rounded-lg">
                                                 {type.icon}
                                             </div>
                                             <div>
-                                                <h3 className="font-bold text-[#042954] text-lg">{type.label}</h3>
-                                                <p className="text-gray-500 text-sm mt-1">{type.desc}</p>
+                                                <h3 className="font-bold text-[#042954] dark:text-white text-lg">{type.label}</h3>
+                                                <p className="text-gray-500 dark:text-slate-400 text-sm mt-1">{type.desc}</p>
                                             </div>
                                             <div className="ml-auto mt-auto mb-auto text-gray-300 group-hover:text-[#ffa000]">
                                                 <ChevronRight size={24} />
@@ -529,7 +521,7 @@ export default function EtudiantDocumentsPage() {
                             )}
 
                             {createStep === 2 && (
-                                <form id="create-doc-form" onSubmit={handleSubmitCreate} className="space-y-6 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                                <form id="create-doc-form" onSubmit={handleSubmitCreate} className="space-y-6 bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm">
                                     <div className="bg-blue-50 text-blue-800 p-4 rounded-lg flex items-center gap-3 font-semibold mb-6">
                                         <span className="text-blue-500">{DOCUMENT_TYPES.find(t => t.id === selectedType)?.icon}</span>
                                         Déposer une demande de : {getTypeLabel(selectedType)}
@@ -545,29 +537,29 @@ export default function EtudiantDocumentsPage() {
                                                 {enseignants.length === 0 ? (
                                                     <p className="text-red-500 text-sm italic">Aucun enseignant disponible.</p>
                                                 ) : (
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-48 overflow-y-auto p-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-gray-50 dark:bg-slate-800/50">
                                                         {enseignants.map(ens => (
                                                             <div 
                                                                 key={ens.id}
                                                                 onClick={() => toggleEnseignantSelection(ens.id)}
                                                                 className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border transition-colors ${
                                                                     selectedEnseignants.includes(ens.id) 
-                                                                    ? 'bg-blue-50 border-blue-400 text-[#042954]' 
-                                                                    : 'bg-white border-gray-200 hover:border-gray-300'
+                                                                    ? 'bg-blue-50 border-blue-400 text-[#042954] dark:text-white' 
+                                                                    : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:border-slate-600'
                                                                 }`}
                                                             >
                                                                 <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${
-                                                                    selectedEnseignants.includes(ens.id) ? 'bg-[#ffa000] border-[#ffa000] text-white' : 'border-gray-300'
+                                                                    selectedEnseignants.includes(ens.id) ? 'bg-[#ffa000] border-[#ffa000] text-white' : 'border-gray-300 dark:border-slate-600'
                                                                 }`}>
                                                                     {selectedEnseignants.includes(ens.id) && <Check size={12} />}
                                                                 </div>
-                                                                <UserCircle2 size={18} className="text-gray-400" />
+                                                                <UserCircle2 size={18} className="text-gray-400 dark:text-slate-500" />
                                                                 <span className="font-medium text-sm">{ens.nom} {ens.prenom}</span>
                                                             </div>
                                                         ))}
                                                     </div>
                                                 )}
-                                                <p className="text-xs text-gray-500 mt-2">
+                                                <p className="text-xs text-gray-500 dark:text-slate-400 mt-2">
                                                     {selectedEnseignants.length}/2 enseignants sélectionnés
                                                 </p>
                                             </div>
@@ -577,7 +569,7 @@ export default function EtudiantDocumentsPage() {
                                                     required
                                                     rows={3}
                                                     placeholder="Précisez la raison de votre demande..."
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000] resize-none"
+                                                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000] resize-none"
                                                     value={motif}
                                                     onChange={e => setMotif(e.target.value)}
                                                 />
@@ -594,7 +586,7 @@ export default function EtudiantDocumentsPage() {
                                                     <input 
                                                         type="text" required
                                                         placeholder="Ex: Tech Corp"
-                                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
+                                                        className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
                                                         value={nomEntreprise}
                                                         onChange={e => setNomEntreprise(e.target.value)}
                                                     />
@@ -604,7 +596,7 @@ export default function EtudiantDocumentsPage() {
                                                     <input 
                                                         type="text" required
                                                         placeholder="Ex: M. Dupont"
-                                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
+                                                        className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
                                                         value={nomEncadrant}
                                                         onChange={e => setNomEncadrant(e.target.value)}
                                                     />
@@ -615,7 +607,7 @@ export default function EtudiantDocumentsPage() {
                                                 <input 
                                                     type="text" required
                                                     placeholder="Adresse complète"
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
+                                                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
                                                     value={adresseEntreprise}
                                                     onChange={e => setAdresseEntreprise(e.target.value)}
                                                 />
@@ -626,7 +618,7 @@ export default function EtudiantDocumentsPage() {
                                                     required
                                                     rows={3}
                                                     placeholder="Décrivez brièvement le sujet ou les missions"
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000] resize-none"
+                                                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000] resize-none"
                                                     value={motif}
                                                     onChange={e => setMotif(e.target.value)}
                                                 />
@@ -641,7 +633,7 @@ export default function EtudiantDocumentsPage() {
                                             <textarea 
                                                 rows={4}
                                                 placeholder="Saisir un motif si nécessaire..."
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000] resize-none"
+                                                className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000] resize-none"
                                                 value={motif}
                                                 onChange={e => setMotif(e.target.value)}
                                             />
@@ -651,7 +643,7 @@ export default function EtudiantDocumentsPage() {
                             )}
                         </div>
 
-                        <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-white">
+                        <div className="p-4 border-t border-gray-100 dark:border-slate-700/50 flex justify-end gap-3 bg-white dark:bg-slate-800">
                             {createStep === 1 ? (
                                 <button
                                     onClick={() => setIsCreateModalOpen(false)}

@@ -2,17 +2,27 @@
 
 import Link from "next/link";
 import { GraduationCap, ArrowRight, BookOpen, Calendar, ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import ThemeToggle from "@/app/components/ThemeToggle";
+import { Toaster, toast } from "react-hot-toast";
 
 export default function LoginPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (searchParams.get("reset") === "success") {
+            toast.success("✅ Mot de passe modifié avec succès. Vous pouvez vous connecter.");
+            router.replace("/login");
+        }
+    }, [searchParams, router]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -26,27 +36,32 @@ export default function LoginPage() {
                 sessionStorage.setItem("token", data.accessToken);
                 sessionStorage.setItem("role", data.role);
 
-                // Redirection vers le dashboard global peu importe le rôle pour l'instant
-                router.push("/dashboard");
+                const dashboardPath =
+                    data.role === "ROLE_ADMIN"
+                        ? "/admin/dashboard"
+                        : data.role === "ROLE_ENSEIGNANT"
+                            ? "/enseignant/dashboard"
+                            : data.role === "ROLE_ETUDIANT"
+                                ? "/etudiant/dashboard"
+                                : "/dashboard";
 
-                /* Note pour plus tard : Si vous souhaitez séparer par rôles :
-                if (data.role === "ROLE_ADMIN") router.push("/admin/dashboard");
-                else if (data.role === "ROLE_ENSEIGNANT") router.push("/enseignant/dashboard");
-                else if (data.role === "ROLE_ETUDIANT") router.push("/etudiant/dashboard");
-                else router.push("/dashboard"); // Fallback
-                */
+                router.push(dashboardPath);
             } else {
                 setError("Réponse de connexion invalide.");
             }
-        } catch (err: any) {
-            setError(err.message || "Erreur lors de la connexion. Veuillez vérifier vos identifiants.");
+        } catch (err: unknown) {
+            const message = err instanceof Error
+                ? err.message
+                : "Erreur lors de la connexion. Veuillez vérifier vos identifiants.";
+            setError(message);
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen font-sans bg-[#f0f1f3] text-[#333333] flex flex-col md:flex-row">
+        <div className="relative min-h-screen font-sans bg-[#f0f1f3] dark:bg-slate-900 text-[#333333] dark:text-slate-100 flex flex-col md:flex-row">
+            <Toaster position="top-right" />
             {/* Left Branding/Info Panel */}
             <div className="hidden md:flex md:w-1/2 bg-[#042954] text-white p-12 flex-col justify-between relative overflow-hidden">
                 {/* Abstract shapes from the dashboard theme */}
@@ -61,7 +76,7 @@ export default function LoginPage() {
                         <span className="text-3xl font-bold tracking-tight">Gestion<span className="font-light text-white/80">Ac</span></span>
                     </Link>
 
-                    <h1 className="text-4xl lg:text-5xl font-extrabold leading-tight mb-6">
+                    <h1 className="text-[#042954] dark:text-whitexl lg:text-[#042954] dark:text-whitexl font-extrabold leading-tight mb-6">
                         Bienvenue dans votre <span className="text-[#ffa000]">espace numérique</span>
                     </h1>
                     <p className="text-lg text-white/80 max-w-md leading-relaxed mb-12">
@@ -96,24 +111,25 @@ export default function LoginPage() {
             </div>
 
             {/* Right Login Form Panel */}
-            <div className="flex-1 flex flex-col justify-center px-6 py-12 sm:px-12 lg:px-24 xl:px-32 bg-white relative">
+            <div className="flex-1 flex flex-col justify-center px-6 py-12 sm:px-12 lg:px-24 xl:px-32 bg-white dark:bg-slate-800 relative">
                 <div className="md:hidden flex items-center gap-2 mb-12">
                     <div className="bg-[#ffa000] p-2 rounded shadow-sm">
                         <GraduationCap size={24} className="text-white" />
                     </div>
-                    <span className="text-2xl font-bold tracking-tight text-[#042954]">Gestion<span className="font-light text-[#042954]/80">Ac</span></span>
+                    <span className="text-[#042954] dark:text-whitexl font-bold tracking-tight text-[#042954] dark:text-white">Gestion<span className="font-light text-[#042954] dark:text-white/80">Ac</span></span>
                 </div>
 
                 <div className="w-full max-w-md mx-auto">
-                    <div className="mb-8 flex justify-center md:justify-start">
+                    <div className="mb-8 flex items-center justify-center gap-4 md:justify-between md:gap-0">
                         <Link href="/" className="inline-flex items-center justify-center w-10 h-10 bg-[#ffa000] text-white rounded shadow-sm hover:bg-[#ff8f00] transition-colors">
                             <ArrowLeft size={20} />
                         </Link>
+                        <ThemeToggle />
                     </div>
 
                     <div className="mb-10 text-center md:text-left">
-                        <h2 className="text-3xl font-extrabold text-[#042954] mb-2 tracking-tight">Se connecter</h2>
-                        <p className="text-gray-600">Entrez vos identifiants pour accéder à votre portail</p>
+                        <h2 className="text-3xl font-extrabold text-[#042954] dark:text-white mb-2 tracking-tight">Se connecter</h2>
+                        <p className="text-gray-600 dark:text-slate-300">Entrez vos identifiants pour accéder à votre portail</p>
                     </div>
 
                     {error && (
@@ -124,13 +140,13 @@ export default function LoginPage() {
 
                     <form onSubmit={handleLogin} className="flex flex-col gap-6">
                         <div className="space-y-2">
-                            <label className="text-sm font-bold text-[#333333]" htmlFor="email">Adresse e-mail</label>
+                            <label className="text-sm font-bold text-[#333333] dark:text-slate-100" htmlFor="email">Adresse e-mail</label>
                             <input
                                 id="email"
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full bg-[#f0f1f3] border-none rounded px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#ffa000] transition-shadow text-[#333333] placeholder:text-gray-400"
+                                className="w-full bg-[#f0f1f3] dark:bg-slate-900 border-none rounded px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#ffa000] transition-shadow text-[#333333] dark:text-slate-100 placeholder:text-gray-400 dark:text-slate-500"
                                 placeholder="votre.nom@institut.edu"
                                 required
                             />
@@ -138,15 +154,15 @@ export default function LoginPage() {
 
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <label className="text-sm font-bold text-[#333333]" htmlFor="password">Mot de passe</label>
-                                <Link href="#" className="text-xs font-bold text-[#03a9f4] hover:underline">Mot de passe oublié ?</Link>
+                                <label className="text-sm font-bold text-[#333333] dark:text-slate-100" htmlFor="password">Mot de passe</label>
+                                <Link href="/forgot-password" className="text-xs font-bold text-[#03a9f4] hover:underline">Mot de passe oublié ?</Link>
                             </div>
                             <input
                                 id="password"
                                 type={showPassword ? "text" : "password"}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full bg-[#f0f1f3] border-none rounded px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#ffa000] transition-shadow text-[#333333] placeholder:text-gray-400"
+                                className="w-full bg-[#f0f1f3] dark:bg-slate-900 border-none rounded px-4 py-3.5 outline-none focus:ring-2 focus:ring-[#ffa000] transition-shadow text-[#333333] dark:text-slate-100 placeholder:text-gray-400 dark:text-slate-500"
                                 placeholder="••••••••"
                                 required
                             />
@@ -158,9 +174,9 @@ export default function LoginPage() {
                                 id="show-password"
                                 checked={showPassword}
                                 onChange={(e) => setShowPassword(e.target.checked)}
-                                className="rounded text-[#ffa000] focus:ring-[#ffa000] h-5 w-5 bg-[#f0f1f3] border-none cursor-pointer"
+                                className="rounded text-[#ffa000] focus:ring-[#ffa000] h-5 w-5 bg-[#f0f1f3] dark:bg-slate-900 border-none cursor-pointer"
                             />
-                            <label htmlFor="show-password" className="text-sm text-gray-600 cursor-pointer font-medium">Afficher le mot de passe</label>
+                            <label htmlFor="show-password" className="text-sm text-gray-600 dark:text-slate-300 cursor-pointer font-medium">Afficher le mot de passe</label>
                         </div>
 
                         <button
@@ -173,8 +189,8 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    <div className="mt-10 pt-8 border-t border-gray-100 text-center">
-                        <p className="text-sm text-gray-600">
+                    <div className="mt-10 pt-8 border-t border-gray-100 dark:border-slate-700 text-center">
+                        <p className="text-sm text-gray-600 dark:text-slate-300">
                             Besoin d&apos;aide ? <Link href="#" className="font-bold text-[#03a9f4] hover:underline">Contactez le secrétariat</Link>
                         </p>
                     </div>

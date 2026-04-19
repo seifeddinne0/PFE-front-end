@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, API_URL } from "@/lib/api";
 import toast from "react-hot-toast";
-import { FileText, FileCheck, FileX, DollarSign, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, AlertCircle } from "lucide-react";
+import { FileText, FileCheck, FileX, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, AlertCircle } from "lucide-react";
 
 interface Facture {
     id: number;
     numero: string;
-    type: string;
+    typeFacture?: string;
     description?: string;
     montant: number;
-    dateEcheance: string;
     datePaiement?: string;
+    preuvePaiement?: string;
     statut: string;
 }
 
@@ -27,6 +27,9 @@ export default function EtudiantFacturesPage() {
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [confirmationDates, setConfirmationDates] = useState<Record<number, string>>({});
+    const [confirmationFiles, setConfirmationFiles] = useState<Record<number, File | null>>({});
+    const [uploadingFactureId, setUploadingFactureId] = useState<number | null>(null);
 
     const fetchFactures = async () => {
         setIsLoading(true);
@@ -67,20 +70,55 @@ export default function EtudiantFacturesPage() {
 
     const getStatutBadge = (statut: string) => {
         switch (statut) {
-            case 'PAYEE': return <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold">PAYÉE</span>;
-            case 'NON_PAYEE': return <span className="bg-red-100 text-red-700 px-2.5 py-1 rounded-full text-xs font-bold">NON PAYÉE</span>;
-            case 'EN_ATTENTE': return <span className="bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full text-xs font-bold">EN ATTENTE</span>;
-            case 'ANNULEE': return <span className="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full text-xs font-bold">ANNULÉE</span>;
-            default: return <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full text-xs font-bold">{statut}</span>;
+            case 'PAYEE': return <span className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 px-2.5 py-1 rounded-full text-xs font-bold">PAYÉE</span>;
+            case 'NON_PAYEE': return <span className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 px-2.5 py-1 rounded-full text-xs font-bold">NON PAYÉE</span>;
+            case 'EN_ATTENTE': return <span className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 px-2.5 py-1 rounded-full text-xs font-bold">EN ATTENTE</span>;
+            case 'ANNULEE': return <span className="bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-zinc-300 px-2.5 py-1 rounded-full text-xs font-bold">ANNULÉE</span>;
+            default: return <span className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2.5 py-1 rounded-full text-xs font-bold">{statut}</span>;
         }
     };
 
-    const isOverdue = (f: Facture) => {
-        if (f.statut !== 'NON_PAYEE' || !f.dateEcheance) return false;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const echeance = new Date(f.dateEcheance);
-        return echeance < today;
+    const buildUploadUrl = (path?: string) => {
+        if (!path) return "#";
+        if (path.startsWith("http://") || path.startsWith("https://")) return path;
+        return `${API_URL}${path}`;
+    };
+
+    const handleReceiptFileChange = (factureId: number, file: File | null) => {
+        setConfirmationFiles(prev => ({ ...prev, [factureId]: file }));
+    };
+
+    const handleConfirmPayment = async (factureId: number) => {
+        const datePaiement = confirmationDates[factureId];
+        const file = confirmationFiles[factureId];
+
+        if (!datePaiement) {
+            toast.error("Veuillez sélectionner une date de paiement.");
+            return;
+        }
+
+        if (!file) {
+            toast.error("Veuillez uploader une photo du reçu.");
+            return;
+        }
+
+        try {
+            setUploadingFactureId(factureId);
+            const formData = new FormData();
+            formData.append("datePaiement", datePaiement);
+            formData.append("image", file);
+
+            await api.postFormData(`/api/etudiant/factures/${factureId}/confirmation-paiement`, formData);
+            toast.success("Confirmation de paiement envoyée.");
+
+            setConfirmationDates(prev => ({ ...prev, [factureId]: "" }));
+            setConfirmationFiles(prev => ({ ...prev, [factureId]: null }));
+            await fetchFactures();
+        } catch (error: any) {
+            toast.error(error.message || "Erreur lors de l'envoi de la confirmation.");
+        } finally {
+            setUploadingFactureId(null);
+        }
     };
 
     // Derived Statistics
@@ -92,7 +130,7 @@ export default function EtudiantFacturesPage() {
     const filteredFactures = factures.filter(f => {
         const matchesSearch = 
             (f.numero && f.numero.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (f.type && f.type.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (f.typeFacture && f.typeFacture.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (f.description && f.description.toLowerCase().includes(searchTerm.toLowerCase()));
             
         const matchesStatut = statutFilter === "Tous" || f.statut === statutFilter;
@@ -104,34 +142,34 @@ export default function EtudiantFacturesPage() {
 
     return (
         <div className="space-y-6">
-            <h1 className="text-2xl font-bold text-[#042954]">Mes Factures</h1>
+            <h1 className="text-2xl font-bold text-[#042954] dark:text-white">Mes Factures</h1>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm flex items-center justify-between">
+                <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-gray-500 text-sm font-medium">Total à payer</p>
-                        <h3 className="text-2xl font-bold text-red-600 mt-1">{formatMontant(totalAPayer)}</h3>
+                        <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">Total à payer</p>
+                        <h3 className="text-2xl font-bold text-red-600 dark:text-red-300 mt-1">{formatMontant(totalAPayer)}</h3>
                     </div>
-                    <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-600">
+                    <div className="w-12 h-12 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-300">
                         <AlertCircle size={24} />
                     </div>
                 </div>
-                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm flex items-center justify-between">
+                <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-gray-500 text-sm font-medium">Total payé</p>
-                        <h3 className="text-2xl font-bold text-green-600 mt-1">{formatMontant(totalPaye)}</h3>
+                        <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">Total payé</p>
+                        <h3 className="text-2xl font-bold text-green-600 dark:text-green-300 mt-1">{formatMontant(totalPaye)}</h3>
                     </div>
-                    <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-600">
-                        <DollarSign size={24} />
+                    <div className="w-12 h-12 rounded-full bg-green-50 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-300">
+                        <span className="text-base font-black tracking-wide">DT</span>
                     </div>
                 </div>
-                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm flex items-center justify-between">
+                <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-gray-500 text-sm font-medium">Nombre de factures</p>
-                        <h3 className="text-2xl font-bold text-blue-600 mt-1">{countTotal}</h3>
+                        <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">Nombre de factures</p>
+                        <h3 className="text-2xl font-bold text-blue-600 dark:text-blue-300 mt-1">{countTotal}</h3>
                     </div>
-                    <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                    <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-300">
                         <FileText size={24} />
                     </div>
                 </div>
@@ -177,7 +215,7 @@ export default function EtudiantFacturesPage() {
                                 <th className="p-4 font-semibold">Type</th>
                                 <th className="p-4 font-semibold">Description</th>
                                 <th className="p-4 font-semibold">Montant</th>
-                                <th className="p-4 font-semibold">Date Échéance</th>
+                                <th className="p-4 font-semibold">Confirmation Paiement</th>
                                 <th className="p-4 font-semibold">Statut</th>
                                 <th className="p-4 font-semibold">Date Paiement</th>
                             </tr>
@@ -196,9 +234,8 @@ export default function EtudiantFacturesPage() {
                                 </tr>
                             ) : (
                                 paginatedFactures.map((facture) => {
-                                    const isRowOverdue = isOverdue(facture);
                                     return (
-                                        <tr key={facture.id} className={`border-b border-gray-100 transition-colors ${isRowOverdue ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-gray-50/50'}`}>
+                                        <tr key={facture.id} className="border-b border-gray-100 transition-colors hover:bg-gray-50/50">
                                             <td className="p-4">
                                                 <div className="flex items-center gap-2">
                                                     <FileText size={16} className="text-[#ffa000]"/>
@@ -207,7 +244,7 @@ export default function EtudiantFacturesPage() {
                                             </td>
                                             <td className="p-4">
                                                 <div className="font-semibold text-sm text-[#042954]">
-                                                    {facture.type}
+                                                    {facture.typeFacture || "-"}
                                                 </div>
                                             </td>
                                             <td className="p-4">
@@ -218,11 +255,53 @@ export default function EtudiantFacturesPage() {
                                             <td className="p-4 font-bold text-gray-800">
                                                 {formatMontant(facture.montant)}
                                             </td>
-                                            <td className="p-4 text-sm font-medium">
-                                                <span className={isRowOverdue ? "text-red-600 font-bold flex items-center gap-1" : "text-gray-600"}>
-                                                    {formatDate(facture.dateEcheance)}
-                                                    {isRowOverdue && <AlertCircle size={14} />}
-                                                </span>
+                                            <td className="p-4 text-sm">
+                                                <div className="space-y-2">
+                                                    {facture.preuvePaiement ? (
+                                                        <div className="space-y-1">
+                                                            <a
+                                                                href={buildUploadUrl(facture.preuvePaiement)}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                className="text-blue-700 hover:underline font-medium"
+                                                            >
+                                                                Voir le reçu
+                                                            </a>
+                                                            {facture.statut === "EN_ATTENTE" && (
+                                                                <div className="text-xs text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded inline-block">
+                                                                    En attente de validation
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-gray-500">Non envoyé</span>
+                                                    )}
+
+                                                    {(facture.statut === "NON_PAYEE" || facture.statut === "EN_ATTENTE") && (
+                                                        <div className="space-y-1">
+                                                            <input
+                                                                type="date"
+                                                                value={confirmationDates[facture.id] || ""}
+                                                                onChange={(e) => setConfirmationDates(prev => ({ ...prev, [facture.id]: e.target.value }))}
+                                                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
+                                                            />
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                onChange={(e) => handleReceiptFileChange(facture.id, e.target.files?.[0] || null)}
+                                                                className="w-full text-xs"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                disabled={uploadingFactureId === facture.id}
+                                                                onClick={() => handleConfirmPayment(facture.id)}
+                                                                className="px-2 py-1 text-xs rounded bg-[#042954] text-white hover:bg-[#031f40] disabled:opacity-60"
+                                                            >
+                                                                {uploadingFactureId === facture.id ? "Envoi..." : "Confirmer paiement"}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="p-4">
                                                 {getStatutBadge(facture.statut)}
@@ -248,16 +327,15 @@ export default function EtudiantFacturesPage() {
                             <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100">Aucune facture trouvée.</div>
                         ) : (
                             paginatedFactures.map((facture) => {
-                                const isRowOverdue = isOverdue(facture);
                                 return (
-                                    <div key={facture.id} className={`bg-white p-4 rounded-xl shadow-sm border relative flex flex-col gap-3 transition-colors ${isRowOverdue ? 'border-red-200 bg-red-50/30' : 'border-gray-200'}`}>
+                                    <div key={facture.id} className="bg-white p-4 rounded-xl shadow-sm border relative flex flex-col gap-3 transition-colors border-gray-200">
                                         <div className="flex justify-between items-start mb-1">
                                             <div className="flex flex-col gap-1 pr-2">
                                                 <div className="flex items-center gap-2">
                                                     <FileText size={18} className="text-[#ffa000]"/>
                                                     <span className="font-bold text-[#333333] text-base">{facture.numero}</span>
                                                 </div>
-                                                <div className="font-semibold text-sm text-[#042954]">{facture.type}</div>
+                                                <div className="font-semibold text-sm text-[#042954]">{facture.typeFacture || "-"}</div>
                                             </div>
                                             <div className="flex flex-col items-end gap-1 shrink-0">
                                                 <span className="font-bold text-xl text-gray-800 tracking-tight">{formatMontant(facture.montant)}</span>
@@ -267,24 +345,54 @@ export default function EtudiantFacturesPage() {
                                         
                                         <div className="space-y-2 bg-white/60 p-3 rounded-lg border border-gray-100 text-sm">
                                             <div className="flex justify-between items-center py-1 border-b border-gray-200">
-                                                <span className="text-gray-500">Échéance</span>
-                                                <span className={isRowOverdue ? "text-red-600 font-bold flex items-center gap-1" : "font-medium text-gray-700"}>
-                                                    {formatDate(facture.dateEcheance)}
-                                                    {isRowOverdue && <AlertCircle size={14} />}
-                                                </span>
+                                                <span className="text-gray-500">Confirmation</span>
+                                                {facture.preuvePaiement ? (
+                                                    <a
+                                                        href={buildUploadUrl(facture.preuvePaiement)}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="font-medium text-blue-700 hover:underline"
+                                                    >
+                                                        Voir reçu
+                                                    </a>
+                                                ) : (
+                                                    <span className="font-medium text-gray-700">Non envoyée</span>
+                                                )}
                                             </div>
-                                            {(facture.statut === 'PAYEE' || facture.datePaiement) && (
-                                                <div className="flex justify-between items-center py-1 border-b border-gray-200">
-                                                    <span className="text-gray-500">Payé le</span>
-                                                    <span className="font-medium text-gray-700">{formatDate(facture.datePaiement)}</span>
-                                                </div>
-                                            )}
+                                            <div className="flex justify-between items-center py-1 border-b border-gray-200">
+                                                <span className="text-gray-500">Date paiement</span>
+                                                <span className="font-medium text-gray-700">{formatDate(facture.datePaiement)}</span>
+                                            </div>
                                             <div>
                                                 <span className="block text-gray-500 text-xs mb-1 mt-1">Description</span>
                                                 <div className="bg-gray-100 p-2 rounded text-xs text-gray-700">
                                                     {facture.description || "Aucune description"}
                                                 </div>
                                             </div>
+                                            {(facture.statut === "NON_PAYEE" || facture.statut === "EN_ATTENTE") && (
+                                                <div className="space-y-2 pt-2 border-t border-gray-200">
+                                                    <input
+                                                        type="date"
+                                                        value={confirmationDates[facture.id] || ""}
+                                                        onChange={(e) => setConfirmationDates(prev => ({ ...prev, [facture.id]: e.target.value }))}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
+                                                    />
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={(e) => handleReceiptFileChange(facture.id, e.target.files?.[0] || null)}
+                                                        className="w-full text-xs"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        disabled={uploadingFactureId === facture.id}
+                                                        onClick={() => handleConfirmPayment(facture.id)}
+                                                        className="w-full px-3 py-2 text-xs rounded bg-[#042954] text-white hover:bg-[#031f40] disabled:opacity-60"
+                                                    >
+                                                        {uploadingFactureId === facture.id ? "Envoi..." : "Confirmer paiement"}
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 );

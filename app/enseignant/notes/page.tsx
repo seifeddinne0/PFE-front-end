@@ -1,482 +1,596 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Edit2, Trash2, Save, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
-import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { Save, Filter, Search, CheckCircle, RefreshCw, Users, Edit2 } from "lucide-react";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
 
-interface Etudiant {
+interface Student {
     id: number;
     matricule: string;
     nom: string;
     prenom: string;
-}
-
-interface Matiere {
-    id: number;
-    nom: string;
-    code: string;
+    classeId: number;
+    classeCode?: string;
 }
 
 interface Note {
     id: number;
     etudiantId: number;
-    etudiantNom: string;
-    etudiantPrenom: string;
     matiereId: number;
-    matiere: string;
-    note: number;
-    type: string;
+    valeur: number;
+    typeNote: string;
     semestre: string;
     commentaire: string;
 }
 
-const TYPES_NOTE = [
-    { value: "EXAMEN", label: "Examen" },
-    { value: "CONTROLE", label: "Contrôle Continu (CC)" },
-    { value: "TP", label: "Travaux Pratiques (TP)" },
-    { value: "PROJET", label: "Projet" },
-];
+type NoteValues = {
+    CONTROLE: { note: string, id?: number };
+    TP: { note: string, id?: number };
+    EXAMEN: { note: string, id?: number };
+};
 
-const SEMESTRES = ["S1", "S2", "S3", "S4", "S5", "S6"];
+const SEMESTRES = ["S1", "S2", "S3", "S4", "S5"];
 
 export default function EnseignantNotesPage() {
-    const [etudiants, setEtudiants] = useState<Etudiant[]>([]);
-    const [matieres, setMatieres] = useState<Matiere[]>([]);
+    const noteInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+    // Dropdown data
+    const [classes, setClasses] = useState<any[]>([]);
+    const [filieres, setFilieres] = useState<any[]>([]);
+    const [matieres, setMatieres] = useState<any[]>([]);
+    const [enseignantMatieresId, setEnseignantMatieresId] = useState<number[]>([]);
+    const [enseignantId, setEnseignantId] = useState<number | null>(null);
+    const [canManageNotes, setCanManageNotes] = useState<boolean>(false);
+    
+    // Application state
+    const [etudiants, setEtudiants] = useState<Student[]>([]);
     const [notes, setNotes] = useState<Note[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(5);
+    const [isSaving, setIsSaving] = useState(false);
 
-    // Edit modal
-    const [editingNote, setEditingNote] = useState<Note | null>(null);
-    const [editForm, setEditForm] = useState({
-        etudiantId: "",
-        matiereId: "",
-        note: "",
-        type: "EXAMEN",
-        semestre: "S1",
-        commentaire: ""
-    });
-    const [isEditing, setIsEditing] = useState(false);
+    // Selections
+    const [selectedFiliere, setSelectedFiliere] = useState("");
+    const [selectedNiveau, setSelectedNiveau] = useState("");
+    const [selectedClasse, setSelectedClasse] = useState("");
+    const [selectedMatiere, setSelectedMatiere] = useState("");
+    const [selectedSemestre, setSelectedSemestre] = useState("S1");
 
-    // --- Data fetching ---
-    const fetchDropdowns = async () => {
-        try {
-            const [etudiantsData, matieresData] = await Promise.all([
-                api.get("/api/admin/etudiants"),
-                api.get("/api/admin/matieres")
-            ]);
-
-            if (etudiantsData && Array.isArray(etudiantsData.content)) {
-                setEtudiants(etudiantsData.content);
-            } else if (Array.isArray(etudiantsData)) {
-                setEtudiants(etudiantsData);
-            }
-
-            if (matieresData && Array.isArray(matieresData.content)) {
-                setMatieres(matieresData.content);
-            } else if (Array.isArray(matieresData)) {
-                setMatieres(matieresData);
-            }
-        } catch {
-            // dropdowns might fail silently
-        }
-    };
-
-    const fetchNotes = async () => {
-        try {
-            const data = await api.get("/api/admin/notes");
-            if (data && Array.isArray(data.content)) {
-                setNotes(data.content);
-            } else if (Array.isArray(data)) {
-                setNotes(data);
-            } else {
-                setNotes([]);
-            }
-        } catch {
-            setNotes([]);
-        }
-    };
+    // Draft form state for bulk editing: Record<etudiantId, NoteValues>
+    const [draftNotes, setDraftNotes] = useState<Record<number, NoteValues>>({});
 
     useEffect(() => {
-        const init = async () => {
-            await Promise.all([fetchDropdowns(), fetchNotes()]);
-            setIsLoading(false);
+        const initData = async () => {
+            try {
+                const [classesData, filieresData, matieresData, etudiantsData, notesData, seancesData, profilData] = await Promise.all([
+                    api.get("/api/admin/classes").catch(() => []),
+                    api.get("/api/admin/filieres").catch(() => []),
+                    api.get("/api/admin/matieres").catch(() => ({ content: [] })),
+                    api.get("/api/admin/etudiants?size=1000").catch(() => ({ content: [] })),
+                    api.get("/api/admin/notes?page=0&size=5000").catch(() => ({ content: [] })),
+                    api.get("/api/enseignant/seances").catch(() => []),
+                    api.get("/api/enseignant/profil").catch(() => null)
+                ]);
+
+                if (profilData) {
+                    setEnseignantId(profilData.id);
+                    setCanManageNotes(Boolean(profilData.canManageNotes));
+                }
+
+                // Ensure data structures
+                setClasses(Array.isArray(classesData) ? classesData : classesData.content || []);
+                setFilieres(Array.isArray(filieresData) ? filieresData : filieresData.content || []);
+                setMatieres(Array.isArray(matieresData) ? matieresData : matieresData.content || []);
+                setEtudiants(Array.isArray(etudiantsData) ? etudiantsData : etudiantsData.content || []);
+                setNotes(Array.isArray(notesData) ? notesData : notesData.content || []);
+                
+                const seanceMatiereIds = [...new Set(Array.isArray(seancesData) ? seancesData.map((s: any) => s.matiereId) : [])] as number[];
+                setEnseignantMatieresId(seanceMatiereIds);
+
+            } catch (error) {
+                console.error("Erreur de chargement", error);
+            } finally {
+                setIsLoading(false);
+            }
         };
-        init();
+        initData();
     }, []);
 
-    // --- Edit ---
-    const openEditModal = (note: Note) => {
-        setEditingNote(note);
-        setEditForm({
-            etudiantId: String(note.etudiantId || ""),
-            matiereId: String(note.matiereId || ""),
-            note: String(note.note ?? ""),
-            type: note.type || "EXAMEN",
-            semestre: note.semestre || "S1",
-            commentaire: note.commentaire || ""
+    // Derived lists
+    const filteredNiveaux = classes
+        .filter(c => c.filiereCode === selectedFiliere)
+        .map(c => c.niveauCode)
+        .filter((v, i, a) => a.indexOf(v) === i);
+
+    const filteredClasses = classes.filter(
+        c => c.filiereCode === selectedFiliere && c.niveauCode === selectedNiveau
+    );
+
+    // Robust student filtering accommodating missing DB relations
+    const classStudents = etudiants.filter(e => {
+        if (!selectedClasse) return false;
+        const targetClasseObj = classes.find(c => String(c.id) === selectedClasse);
+        const codeToMatch = targetClasseObj ? targetClasseObj.code : selectedClasse;
+        
+        return String(e.classeId) === selectedClasse || 
+               (!!e.classeCode && e.classeCode === codeToMatch) ||
+               (!!e.matricule && e.matricule.includes(codeToMatch));
+    });
+
+    // Matieres restricted strictly by selected Semester
+    const semesterMatieres = matieres.filter(m => m.semestre === selectedSemestre);
+
+    // Auto update selectedMatiere implicitly without user select
+    useEffect(() => {
+        if (!selectedClasse || !selectedSemestre) {
+            setSelectedMatiere("");
+            return;
+        }
+        
+        // Find matieres assigned to this teacher for this semester
+        // We check both the direct 'enseignantId' (database schema) and 'seances' mapping
+        const teacherMats = matieres.filter(m => 
+            (enseignantId && m.enseignantId === enseignantId && m.semestre === selectedSemestre) ||
+            (enseignantMatieresId.includes(m.id) && m.semestre === selectedSemestre)
+        );
+        
+        if (teacherMats.length > 0) {
+            setSelectedMatiere(String(teacherMats[0].id));
+        } else {
+            setSelectedMatiere("");
+        }
+    }, [selectedSemestre, selectedClasse, enseignantMatieresId, enseignantId, semesterMatieres, matieres]);
+
+    // When selections change, compute initial drafts
+    useEffect(() => {
+        if (!selectedClasse || !selectedMatiere) return;
+
+        const newDrafts: Record<number, NoteValues> = {};
+        
+        classStudents.forEach(student => {
+            const getNoteData = (type: string) => {
+                const existingNote = notes.find(n => 
+                    n.etudiantId === student.id &&
+                    String(n.matiereId) === selectedMatiere &&
+                        n.typeNote === type &&
+                    n.semestre === selectedSemestre
+                );
+                return {
+                        note: existingNote ? String(existingNote.valeur) : "",
+                    id: existingNote?.id
+                };
+            };
+
+            newDrafts[student.id] = {
+                CONTROLE: getNoteData("CONTROLE"),
+                TP: getNoteData("TP"),
+                EXAMEN: getNoteData("EXAMEN")
+            };
         });
+
+        setDraftNotes(newDrafts);
+    }, [selectedClasse, selectedMatiere, selectedSemestre, notes, etudiants]); 
+
+    // Handlers
+    const normalizeNoteInput = (rawValue: string): string | null => {
+        const normalized = rawValue.replace(",", ".").trim();
+        if (normalized === "") return "";
+
+        if (!/^\d{0,2}(\.\d{0,2})?$/.test(normalized)) {
+            return null;
+        }
+
+        const parsed = Number.parseFloat(normalized);
+        if (Number.isNaN(parsed)) return "";
+        if (parsed < 0) return "0";
+        if (parsed > 20) return "20";
+        return normalized;
     };
 
-    const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target;
-        setEditForm(prev => ({ ...prev, [name]: value }));
+    const clampOnBlur = (rawValue: string): string => {
+        const normalized = rawValue.replace(",", ".").trim();
+        if (normalized === "") return "";
+
+        const parsed = Number.parseFloat(normalized);
+        if (Number.isNaN(parsed)) return "";
+
+        const clamped = Math.max(0, Math.min(20, parsed));
+        return String(clamped);
     };
 
-    const handleEditSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!editingNote) return;
-
-        const noteValue = parseFloat(editForm.note);
-        if (isNaN(noteValue) || noteValue < 0 || noteValue > 20) {
-            toast.error("La note doit être comprise entre 0 et 20.");
+    const handleNoteChange = (studentId: number, type: keyof NoteValues, value: string) => {
+        const nextNote = normalizeNoteInput(value);
+        if (nextNote === null) {
             return;
         }
 
-        setIsEditing(true);
-        try {
-            await api.put(`/api/admin/notes/${editingNote.id}`, {
-                etudiantId: parseInt(editForm.etudiantId),
-                matiereId: parseInt(editForm.matiereId),
-                note: noteValue,
-                type: editForm.type,
-                semestre: editForm.semestre,
-                commentaire: editForm.commentaire
-            });
-            toast.success("Note modifiée avec succès.");
-            setEditingNote(null);
-            await fetchNotes();
-        } catch (error: any) {
-            toast.error(error.message || "Erreur lors de la modification.");
-        } finally {
-            setIsEditing(false);
+        setDraftNotes(prev => ({
+            ...prev,
+            [studentId]: {
+                ...prev[studentId],
+                [type]: { ...prev[studentId][type], note: nextNote }
+            }
+        }));
+
+        const inputKey = `${studentId}-${type}`;
+        requestAnimationFrame(() => {
+            const input = noteInputRefs.current[inputKey];
+            if (input && document.activeElement !== input) {
+                input.focus();
+            }
+        });
+    };
+
+    const handleNoteBlur = (studentId: number, type: keyof NoteValues, value: string) => {
+        const clamped = clampOnBlur(value);
+        setDraftNotes(prev => ({
+            ...prev,
+            [studentId]: {
+                ...prev[studentId],
+                [type]: { ...prev[studentId][type], note: clamped }
+            }
+        }));
+    };
+
+    const handleSaveRow = async (studentId: number) => {
+        if (!canManageNotes) {
+            toast.error("L'administration ne vous a pas encore autorisé à gérer les notes.");
+            return;
         }
-    };
+        if (!selectedClasse || !selectedMatiere) return;
+        setIsSaving(true);
+        let successCount = 0;
+        let errorCount = 0;
 
-    // --- Delete ---
-    const handleDelete = async (id: number) => {
-        if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette note ?")) return;
+        const types = ["CONTROLE", "TP", "EXAMEN"] as const;
+        const studentDrafts = draftNotes[studentId];
+        
+        if (studentDrafts) {
+            for (const type of types) {
+                const draft = studentDrafts[type];
+                if (!draft) continue;
+                
+                // Allow saving "0" but skip completely empty ones that are not already saved
+                if (draft.note === "" && !draft.id) continue;
+                
+                const existingNote = notes.find(n => n.id === draft.id);
+                if (existingNote && String(existingNote.valeur) === draft.note) continue;
 
-        try {
-            await api.delete(`/api/admin/notes/${id}`);
-            toast.success("Note supprimée avec succès.");
-            await fetchNotes();
-        } catch (error: any) {
-            toast.error(error.message || "Erreur lors de la suppression.");
+                if (draft.id && draft.note === "") {
+                    // Empty means delete
+                     try {
+                         await api.delete(`/api/admin/notes/${draft.id}`);
+                         successCount++;
+                     } catch { errorCount++; }
+                     continue;
+                }
+
+                const payload = {
+                    etudiantId: studentId,
+                    matiereId: parseInt(selectedMatiere),
+                    valeur: parseFloat(draft.note || "0"),
+                    typeNote: type,
+                    semestre: selectedSemestre,
+                    commentaire: ""
+                };
+
+                try {
+                    if (draft.id) {
+                        await api.put(`/api/admin/notes/${draft.id}`, payload);
+                    } else {
+                        await api.post("/api/enseignant/notes", payload);
+                    }
+                    successCount++;
+                } catch (error) {
+                    errorCount++;
+                }
+            }
         }
-    };
 
-    // --- Helpers ---
-    const getNoteColor = (note: number) => {
-        if (note >= 16) return "bg-green-100 text-green-700";
-        if (note >= 12) return "bg-blue-100 text-blue-700";
-        if (note >= 10) return "bg-yellow-100 text-yellow-700";
-        return "bg-red-100 text-red-700";
-    };
-
-    const getTypeBadge = (type: string) => {
-        switch (type) {
-            case "EXAMEN": return "bg-purple-100 text-purple-700";
-            case "CONTROLE": return "bg-orange-100 text-orange-700";
-            case "TP": return "bg-cyan-100 text-cyan-700";
-            case "PROJET": return "bg-indigo-100 text-indigo-700";
-            default: return "bg-gray-100 text-gray-700";
+        if (successCount > 0 || errorCount > 0) {
+            const newNotesData = await api.get("/api/admin/notes?page=0&size=5000").catch(() => ({ content: [] }));
+            setNotes(Array.isArray(newNotesData) ? newNotesData : newNotesData.content || []);
+            
+            if (errorCount === 0) {
+                toast.success(`Notes de l'étudiant enregistrées`);
+            } else {
+                toast.error(`Erreur(s) lors de l'enregistrement`);
+            }
+        } else {
+            toast("Aucune modification à enregistrer.");
         }
+        setIsSaving(false);
     };
 
-    // Pagination
-    const totalPages = Math.ceil(notes.length / itemsPerPage);
-    const paginatedNotes = notes.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
+    const handleSaveAll = async () => {
+        if (!canManageNotes) {
+            toast.error("L'administration ne vous a pas encore autorisé à gérer les notes.");
+            return;
+        }
+        if (!selectedClasse || !selectedMatiere) return;
+        setIsSaving(true);
+        let successCount = 0;
+        let errorCount = 0;
 
-    const inputCls = "w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm";
+        const types = ["CONTROLE", "TP", "EXAMEN"] as const;
+
+        for (const student of classStudents) {
+            const studentDrafts = draftNotes[student.id];
+            if (!studentDrafts) continue;
+            
+            for (const type of types) {
+                const draft = studentDrafts[type];
+                if (!draft) continue;
+                if (draft.note === "" && !draft.id) continue;
+                
+                const existingNote = notes.find(n => n.id === draft.id);
+                if (existingNote && String(existingNote.valeur) === draft.note) continue;
+
+                if (draft.id && draft.note === "") {
+                     try {
+                         await api.delete(`/api/admin/notes/${draft.id}`);
+                         successCount++;
+                     } catch { errorCount++; }
+                     continue;
+                }
+
+                const payload = {
+                    etudiantId: student.id,
+                    matiereId: parseInt(selectedMatiere),
+                    valeur: parseFloat(draft.note || "0"),
+                    typeNote: type,
+                    semestre: selectedSemestre,
+                    commentaire: ""
+                };
+
+                try {
+                    if (draft.id) {
+                        await api.put(`/api/admin/notes/${draft.id}`, payload);
+                    } else {
+                        await api.post("/api/enseignant/notes", payload);
+                    }
+                    successCount++;
+                } catch (error) {
+                    errorCount++;
+                }
+            }
+        }
+
+        // Refresh notes
+        if (successCount > 0 || errorCount > 0) {
+            const newNotesData = await api.get("/api/admin/notes?page=0&size=5000").catch(() => ({ content: [] }));
+            setNotes(Array.isArray(newNotesData) ? newNotesData : newNotesData.content || []);
+            
+            if (errorCount === 0) {
+                toast.success(`${successCount} note(s) enregistrée(s) !`);
+            } else {
+                toast.error(`${successCount} succès, ${errorCount} échec(s)`);
+            }
+        } else {
+            toast("Aucune modification à enregistrer.");
+        }
+        setIsSaving(false);
+    };
+
+    if (isLoading) {
+        return (
+            <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#ffa000]"></div>
+            </div>
+        );
+    }
+
+    const inputCls = "w-full bg-[#f8f9fa] dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:focus:bg-slate-800 transition-all text-sm font-semibold dark:text-white";
 
     return (
-        <div className="space-y-8">
-            {/* ─── Notes Table ─── */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                {/* Header with Ajouter button */}
-                <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <h2 className="text-xl font-bold text-[#042954]">Notes & Résultats</h2>
+        <div className="space-y-6 animate-in fade-in">
+            {/* Header */}
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between">
+                <div>
+                    <h1 className="text-[#042954] dark:text-whitexl font-bold text-[#042954] dark:text-white mb-2">Saisie des Notes</h1>
+                    <p className="text-sm text-gray-500 dark:text-slate-400">Sélectionnez vos critères pour évaluer les étudiants.</p>
+                </div>
+            </div>
 
-                    <Link
-                        href="/enseignant/notes/create"
-                        className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm whitespace-nowrap text-sm"
-                    >
-                        <Plus size={18} />
-                        Ajouter Note
-                    </Link>
+            {/* Filter Panel */}
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm">
+                <div className="flex items-center gap-2 mb-6 text-[#042954] dark:text-white font-bold">
+                    <Filter size={20} className="text-[#ffa000]"/>
+                    <span>Critères de sélection</span>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse hidden md:table">
-                        <thead>
-                            <tr className="bg-gray-50 text-gray-500 border-b border-gray-200 text-sm">
-                                <th className="p-4 font-semibold text-center w-16">#</th>
-                                <th className="p-4 font-semibold">Étudiant</th>
-                                <th className="p-4 font-semibold">Matière</th>
-                                <th className="p-4 font-semibold text-center">Note / 20</th>
-                                <th className="p-4 font-semibold text-center">Type</th>
-                                <th className="p-4 font-semibold text-center">Semestre</th>
-                                <th className="p-4 font-semibold">Commentaire</th>
-                                <th className="p-4 font-semibold text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {isLoading ? (
-                                <tr>
-                                    <td colSpan={8} className="p-8 text-center text-gray-500">
-                                        <div className="flex items-center justify-center gap-3">
-                                            <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#ffa000]"></div>
-                                            Chargement en cours...
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : notes.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8} className="p-8 text-center text-gray-500">Aucune note enregistrée.</td>
-                                </tr>
-                            ) : (
-                                paginatedNotes.map((note, index) => (
-                                    <tr key={note.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
-                                        <td className="p-4 text-center text-sm text-gray-400 font-medium">
-                                            {(currentPage - 1) * itemsPerPage + index + 1}
-                                        </td>
-                                        <td className="p-4">
-                                            <div className="font-bold text-[#333333]">{note.etudiantNom} {note.etudiantPrenom}</div>
-                                        </td>
-                                        <td className="p-4 text-gray-500 text-sm">{note.matiere || "-"}</td>
-                                        <td className="p-4 text-center">
-                                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getNoteColor(note.note)}`}>
-                                                {note.note != null ? note.note.toFixed(2) : "-"}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getTypeBadge(note.type)}`}>
-                                                {note.type || "-"}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-bold tracking-wide">
-                                                {note.semestre || "-"}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-gray-500 text-sm truncate max-w-[200px]">{note.commentaire || "-"}</td>
-                                        <td className="p-4 flex items-center justify-end gap-2">
-                                            <button
-                                                onClick={() => openEditModal(note)}
-                                                className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors cursor-pointer"
-                                                title="Modifier"
-                                            >
-                                                <Edit2 size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(note.id)}
-                                                className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors cursor-pointer"
-                                                title="Supprimer"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    {/* Filière */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-bold text-gray-600 dark:text-slate-300">Filière</label>
+                        <select 
+                            value={selectedFiliere} 
+                            onChange={e => {
+                                setSelectedFiliere(e.target.value);
+                                setSelectedNiveau("");
+                                setSelectedClasse("");
+                            }}
+                            className={inputCls}
+                        >
+                            <option value="">-- Sélectionner --</option>
+                            {filieres.map(f => <option key={f.id} value={f.code}>{f.code} - {f.nom}</option>)}
+                        </select>
+                    </div>
 
-                    {/* Mobile version (Cards) */}
-                    <div className="grid grid-cols-1 gap-4 p-4 md:hidden bg-gray-50/30">
-                        {isLoading ? (
-                            <div className="p-8 text-center text-gray-500 flex justify-center items-center gap-3">
-                                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#ffa000]"></div>
-                                Chargement en cours...
-                            </div>
-                        ) : paginatedNotes.length === 0 ? (
-                            <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100">Aucune note trouvée.</div>
-                        ) : (
-                            paginatedNotes.map((note) => (
-                                <div key={note.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative flex flex-col gap-3">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <div className="font-bold text-[#333333] text-lg mb-1">{note.etudiantNom} {note.etudiantPrenom}</div>
-                                            <div className="flex gap-2 mb-2">
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getTypeBadge(note.type)}`}>{note.type || "-"}</span>
-                                                <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold">{note.semestre || "-"}</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col items-end">
-                                            <span className={`px-3 py-1.5 rounded-lg text-xl font-bold shadow-sm ${getNoteColor(note.note)}`}>
-                                                {note.note != null ? note.note.toFixed(2) : "-"}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm">
-                                        <div className="flex justify-between items-center py-1 border-b border-gray-200">
-                                            <span className="text-gray-500">Matière</span>
-                                            <span className="font-bold text-[#042954] text-right">{note.matiere || "-"}</span>
-                                        </div>
-                                        <div>
-                                            <span className="block text-gray-500 text-xs mb-1 mt-1">Commentaire</span>
-                                            <div className="bg-gray-100 p-2 rounded text-xs text-gray-700">
-                                                {note.commentaire || "Aucun commentaire"}
-                                            </div>
-                                        </div>
-                                    </div>
+                    {/* Niveau */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-bold text-gray-600 dark:text-slate-300">Niveau</label>
+                        <select 
+                            value={selectedNiveau} 
+                            onChange={e => {
+                                const niv = e.target.value;
+                                setSelectedNiveau(niv);
+                                setSelectedClasse("");
+                                if (niv.includes("1")) setSelectedSemestre("S1");
+                                else if (niv.includes("2")) setSelectedSemestre("S3");
+                                else if (niv.includes("3")) setSelectedSemestre("S5");
+                            }}
+                            disabled={!selectedFiliere}
+                            className={`${inputCls} disabled:opacity-50`}
+                        >
+                            <option value="">-- Sélectionner --</option>
+                            {filteredNiveaux.map(n => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                    </div>
 
-                                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-                                        <button onClick={() => openEditModal(note)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded" title="Modifier">
-                                            <Edit2 size={16} />
-                                        </button>
-                                        <button onClick={() => handleDelete(note.id)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded" title="Supprimer">
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
-                        )}
+                    {/* Classe */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-bold text-gray-600 dark:text-slate-300">Classe</label>
+                        <select 
+                            value={selectedClasse} 
+                            onChange={e => setSelectedClasse(e.target.value)}
+                            disabled={!selectedNiveau}
+                            className={`${inputCls} disabled:opacity-50`}
+                        >
+                            <option value="">-- Sélectionner --</option>
+                            {filteredClasses.map(c => <option key={c.id} value={c.id}>{c.code}</option>)}
+                        </select>
+                    </div>
+
+                    {/* Semestre */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-bold text-gray-600 dark:text-slate-300">Semestre</label>
+                        <select value={selectedSemestre} onChange={e => setSelectedSemestre(e.target.value)} className={inputCls} disabled={!selectedNiveau}>
+                            {(!selectedNiveau ? SEMESTRES : 
+                                selectedNiveau.includes("1") ? ["S1", "S2"] : 
+                                selectedNiveau.includes("2") ? ["S3", "S4"] : 
+                                selectedNiveau.includes("3") ? ["S5"] : SEMESTRES
+                            ).map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
                     </div>
                 </div>
 
-                {/* Pagination */}
-                {!isLoading && notes.length > 0 && (
-                    <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-3">
-                            <span className="text-gray-500 font-medium">
-                                Affichage de {(currentPage - 1) * itemsPerPage + 1} à {Math.min(currentPage * itemsPerPage, notes.length)} sur {notes.length}
-                            </span>
-                            <div className="flex items-center gap-2 border-l pl-3">
-                                <span className="text-gray-500">Afficher:</span>
-                                <select
-                                    value={itemsPerPage}
-                                    onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                                    className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#ffa000]"
-                                >
-                                    {[5, 10, 25, 50].map(n => (
-                                        <option key={n} value={n}>{n}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <button disabled={currentPage === 1} onClick={() => setCurrentPage(1)} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Première page">
-                                <ChevronsLeft size={18} />
-                            </button>
-                            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Page précédente">
-                                <ChevronLeft size={18} />
-                            </button>
-
-                            {Array.from({ length: totalPages }).map((_, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => setCurrentPage(i + 1)}
-                                    className={`w-8 h-8 rounded border transition-colors font-medium flex items-center justify-center ${currentPage === i + 1
-                                        ? 'bg-[#042954] text-white border-[#042954]'
-                                        : 'border-gray-300 text-gray-500 hover:bg-gray-50'
-                                        }`}
-                                >
-                                    {i + 1}
-                                </button>
-                            ))}
-
-                            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Page suivante">
-                                <ChevronRight size={18} />
-                            </button>
-                            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(totalPages)} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Dernière page">
-                                <ChevronsRight size={18} />
-                            </button>
-                        </div>
+                {!canManageNotes && (
+                    <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 text-sm font-medium dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-300">
+                        Accès en lecture seule: l'administration doit vous autoriser pour ajouter ou modifier les notes.
                     </div>
                 )}
             </div>
 
-            {/* ─── Edit Modal ─── */}
-            {editingNote && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setEditingNote(null)} />
-
-                    <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
-                        <div className="bg-[#042954] px-8 py-5 flex items-center justify-between">
-                            <div>
-                                <h3 className="text-lg font-bold text-white">Modifier la Note</h3>
-                                <p className="text-sm text-white/60 mt-0.5">{editingNote.etudiantNom} {editingNote.etudiantPrenom} — {editingNote.matiere}</p>
-                            </div>
-                            <button onClick={() => setEditingNote(null)} className="text-white/60 hover:text-white transition-colors p-1">
-                                <X size={22} />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleEditSubmit} className="p-8 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-[#333333]">Étudiant <span className="text-red-500">*</span></label>
-                                    <select name="etudiantId" required value={editForm.etudiantId} onChange={handleEditChange} className={inputCls}>
-                                        <option value="">Sélectionner un étudiant</option>
-                                        {etudiants.map(e => (
-                                            <option key={e.id} value={e.id}>{e.nom} {e.prenom} ({e.matricule})</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-[#333333]">Matière <span className="text-red-500">*</span></label>
-                                    <select name="matiereId" required value={editForm.matiereId} onChange={handleEditChange} className={inputCls}>
-                                        <option value="">Sélectionner une matière</option>
-                                        {matieres.map(m => (
-                                            <option key={m.id} value={m.id}>{m.nom} {m.code ? `(${m.code})` : ""}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-[#333333]">Note (0 - 20) <span className="text-red-500">*</span></label>
-                                    <input name="note" type="number" step="0.5" min="0" max="20" required value={editForm.note} onChange={handleEditChange} className={inputCls} />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-[#333333]">Type de Note <span className="text-red-500">*</span></label>
-                                    <select name="type" required value={editForm.type} onChange={handleEditChange} className={inputCls}>
-                                        {TYPES_NOTE.map(t => (
-                                            <option key={t.value} value={t.value}>{t.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-[#333333]">Semestre <span className="text-red-500">*</span></label>
-                                    <select name="semestre" required value={editForm.semestre} onChange={handleEditChange} className={inputCls}>
-                                        {SEMESTRES.map(s => (
-                                            <option key={s} value={s}>Semestre {s}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-[#333333]">Commentaire</label>
-                                <textarea name="commentaire" rows={3} value={editForm.commentaire} onChange={handleEditChange} className={`${inputCls} resize-none`} placeholder="Commentaire optionnel..."></textarea>
-                            </div>
-
-                            <div className="pt-6 border-t border-gray-100 flex items-center justify-end gap-4">
-                                <button type="button" onClick={() => setEditingNote(null)} className="px-6 py-3 font-semibold text-gray-500 hover:bg-gray-50 rounded-lg transition-colors text-sm">
-                                    Annuler
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isEditing}
-                                    className={`px-8 py-3 rounded-lg font-bold text-white transition-all shadow-md flex items-center gap-2 text-sm ${isEditing ? 'bg-[#ffc166] cursor-not-allowed' : 'bg-[#03a9f4] hover:bg-[#0288d1]'}`}
-                                >
-                                    <Save size={18} />
-                                    {isEditing ? "Enregistrement..." : "Mettre à jour"}
-                                </button>
-                            </div>
-                        </form>
+            {/* Students List for Grading */}
+            {selectedClasse && selectedMatiere ? (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden animate-in slide-in-from-bottom-4">
+                    <div className="p-6 border-b border-gray-100 dark:border-slate-700/50 flex flex-col md:flex-row justify-between items-center bg-gray-50 dark:bg-slate-800/50/50 dark:bg-slate-800/50 gap-4">
+                        <h3 className="font-bold tracking-tight text-[#042954] dark:text-white flex items-center gap-2">
+                            <Users size={20} className="text-[#03a9f4]" /> 
+                            Évaluation : {matieres.find(m => String(m.id) === selectedMatiere)?.nom || "..."} ({classStudents.length} étudiants)
+                        </h3>
+                        <button 
+                            onClick={handleSaveAll}
+                            disabled={!canManageNotes || isSaving || classStudents.length === 0}
+                            className="bg-[#03a9f4] hover:bg-[#0288d1] text-white px-5 py-2.5 rounded-lg font-bold shadow-md shadow-blue-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                        >
+                            {isSaving ? <RefreshCw className="animate-spin" size={18}/> : <Save size={18} />}
+                            Sauvegarder Toute la Classe
+                        </button>
                     </div>
+
+                    {classStudents.length === 0 ? (
+                        <div className="p-12 text-center text-gray-500 dark:text-slate-400 font-medium">
+                            Cette classe ne contient aucun étudiant pour le moment.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto p-0">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50 dark:bg-slate-700/50 text-gray-500 dark:text-slate-400 border-b border-gray-100 dark:border-slate-700 text-sm">
+                                        <th className="p-4 font-semibold w-16 text-center">N°</th>
+                                        <th className="p-4 font-semibold min-w-[200px]">Identité</th>
+                                        <th className="p-4 font-semibold text-center w-32">DS</th>
+                                        <th className="p-4 font-semibold text-center w-32">Travaux (TP)</th>
+                                        <th className="p-4 font-semibold text-center w-32">Examen</th>
+                                        <th className="p-4 font-semibold text-center w-32">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {classStudents.map((student, index) => {
+                                        const drafts = draftNotes[student.id] || { 
+                                            CONTROLE: { note: "" }, 
+                                            TP: { note: "" }, 
+                                            EXAMEN: { note: "" } 
+                                        };
+                                        
+                                        const isSavedAny = !!(drafts.CONTROLE?.id || drafts.TP?.id || drafts.EXAMEN?.id);
+                                        const isComplete = !!(drafts.CONTROLE?.id && drafts.TP?.id && drafts.EXAMEN?.id);
+
+                                        // Function to render a note input cell
+                                        const NoteInput = ({ type, placeholder }: { type: keyof NoteValues, placeholder: string }) => {
+                                            const draft = drafts[type];
+                                            const isSaved = !!draft?.id;
+                                            return (
+                                                <div className="relative">
+                                                     <input 
+                                                        ref={(el) => {
+                                                            noteInputRefs.current[`${student.id}-${type}`] = el;
+                                                        }}
+                                                        type="number" step="0.25" min="0" max="20"
+                                                        value={draft?.note || ""}
+                                                        onChange={(e) => handleNoteChange(student.id, type, e.target.value)}
+                                                        onBlur={(e) => handleNoteBlur(student.id, type, e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (["e", "E", "+", "-"].includes(e.key)) {
+                                                                e.preventDefault();
+                                                            }
+                                                        }}
+                                                        disabled={!canManageNotes}
+                                                        placeholder={placeholder}
+                                                        className={`w-full text-center font-bold text-base bg-gray-50 dark:bg-slate-900 border ${isSaved ? 'border-green-300 dark:border-green-800' : 'border-gray-300 dark:border-slate-600'} rounded-lg px-2 py-2 outline-none focus:border-[#ffa000] focus:ring-2 focus:ring-[#ffa000]/20 transition-all dark:text-white`}
+                                                    />
+                                                </div>
+                                            );
+                                        };
+
+                                        return (
+                                            <tr key={student.id} className="border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50/50 dark:hover:bg-[#151515] transition-colors dark:text-slate-400">
+                                                <td className="p-4 text-center text-gray-400 dark:text-slate-500 font-semibold">{index + 1}</td>
+                                                <td className="p-4">
+                                                    <div className="font-bold text-[#042954] dark:text-white uppercase text-sm">
+                                                        {student.nom} <span className="font-medium capitalize text-[#333333] dark:text-slate-300">{student.prenom}</span>
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">{student.matricule}</div>
+                                                </td>
+                                                <td className="p-4 px-2">
+                                                    <NoteInput type="CONTROLE" placeholder="DS /20" />
+                                                </td>
+                                                <td className="p-4 px-2">
+                                                    <NoteInput type="TP" placeholder="TP /20" />
+                                                </td>
+                                                <td className="p-4 px-2">
+                                                    <NoteInput type="EXAMEN" placeholder="EX /20" />
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button 
+                                                            onClick={() => handleSaveRow(student.id)}
+                                                            disabled={!canManageNotes}
+                                                            className={`p-2 rounded-full transition-colors ${isSavedAny ? 'bg-green-100 text-green-600 hover:bg-green-200' : 'bg-gray-100 text-gray-400 dark:text-slate-500 hover:bg-gray-200'}`}
+                                                            title={isSavedAny ? "Mettre à jour" : "Sauvegarder"}
+                                                        >
+                                                            {isSavedAny ? <Edit2 size={18} /> : <CheckCircle size={18} />}
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className="bg-blue-50/50 dark:bg-slate-800/50 border border-blue-100 dark:border-slate-700 rounded-2xl p-12 text-center flex flex-col items-center gap-4 text-blue-800 dark:text-slate-400">
+                    <Search size={48} strokeWidth={1} className="text-blue-300 dark:text-slate-500 opacity-50" />
+                    {selectedClasse && !selectedMatiere ? (
+                        <p className="font-medium max-w-sm text-red-500">Vous n'avez aucune matière affectée pour ce semestre.</p>
+                    ) : (
+                        <p className="font-medium max-w-sm">Définissez vos critères (Filière, Niveau, Classe, Semestre) pour afficher la liste des étudiants et procéder à la saisie.</p>
+                    )}
                 </div>
             )}
         </div>

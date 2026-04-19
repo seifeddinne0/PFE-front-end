@@ -6,6 +6,7 @@ import { LogOut, User, BookOpen, Settings, Bell, LayoutDashboard, FileText, User
 import Link from "next/link";
 import { Toaster } from 'react-hot-toast';
 import { api } from "@/lib/api";
+import ThemeToggle from "@/app/components/ThemeToggle";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -74,7 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-[#f0f1f3]">
+            <div className="min-h-screen flex items-center justify-center bg-[#f0f1f3] dark:bg-[#050505]">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#ffa000]"></div>
             </div>
         );
@@ -86,7 +87,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { name: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard, exact: true },
         { name: "Étudiants", href: "/admin/etudiants", icon: Users, exact: false },
         { name: "Enseignants", href: "/admin/enseignants", icon: User, exact: false },
-        { name: "Classes", href: "/admin/classes", icon: Calendar, exact: false },
         { name: "Notes & Résultats", href: "/admin/notes", icon: FileText, exact: false },
         { name: "Absences", href: "/admin/absences", icon: UserX, exact: false },
         { name: "Factures", href: "/admin/factures", icon: CreditCard, exact: false },
@@ -115,7 +115,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const pageTitle = activeLink ? activeLink.name : "Vue d'ensemble";
 
     return (
-        <div className="min-h-screen bg-[#f0f1f3] font-sans text-[#333333] flex relative">
+        <div className="min-h-screen bg-[#f0f1f3] dark:bg-[#050505] font-sans text-[#333333] dark:text-zinc-100 flex relative">
             <Toaster position="top-right" />
 
             {/* Mobile Sidebar Overlay */}
@@ -130,10 +130,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <aside className={`
                 fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
                 md:relative md:translate-x-0 transition duration-200 ease-in-out
-                w-64 bg-[#042954] text-white flex flex-col shadow-xl z-50
+                w-64 bg-[#042954] dark:bg-[#111111] dark:border-r dark:border-zinc-800/50 text-white flex flex-col shadow-xl z-50
             `}>
-                <div className="p-6 border-b border-white/10 flex items-center justify-between">
-                    <span className="text-2xl font-bold tracking-tight">Gestion<span className="font-light text-[#ffa000]">Ac</span></span>
+                <div className="p-6 border-b border-white/10 dark:border-zinc-800/50 flex items-center justify-between">
+                    <span className="text-2xl font-bold tracking-tight text-white">Gestion<span className="font-light text-[#ffa000]">Ac</span></span>
                     <button className="md:hidden text-white/50 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
                         <X size={24} />
                     </button>
@@ -151,7 +151,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <Link
                                 key={link.href}
                                 href={link.href}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${isActive ? 'bg-[#ffa000] text-white shadow-sm' : 'hover:bg-white/10 text-white/80 hover:text-white'}`}
+                                className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${isActive ? 'bg-[#ffa000] text-white shadow-sm' : 'hover:bg-white/10 dark:bg-slate-800/50 text-white/80 hover:text-white'}`}
                             >
                                 <Icon size={20} />
                                 {link.name}
@@ -159,11 +159,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         );
                     })}
 
-                    <div className="text-xs font-semibold text-white/50 uppercase tracking-wider mt-8 mb-4 px-2">Paramètres</div>
+
 
                     {[
-                        ...(role !== "ROLE_ADMIN" ? [{ name: "Mon Profil", href: "/dashboard/profile", icon: User }] : []),
-                        { name: "Configuration", href: "/dashboard/settings", icon: Settings },
+                        ...(role !== "ROLE_ADMIN" ? [{ name: "Mon Profil", href: "/dashboard/profile", icon: User }] : [])
                     ].map((link) => {
                         const Icon = link.icon;
                         const isActive = pathname === link.href;
@@ -171,7 +170,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <Link
                                 key={link.href}
                                 href={link.href}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${isActive ? 'bg-[#ffa000] text-white shadow-sm' : 'hover:bg-white/10 text-white/80 hover:text-white'}`}
+                                className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${isActive ? 'bg-[#ffa000] text-white shadow-sm' : 'hover:bg-white/10 dark:bg-slate-800/50 text-white/80 hover:text-white'}`}
                             >
                                 <Icon size={20} />
                                 {link.name}
@@ -194,30 +193,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Main Content */}
             <main className="flex-1 flex flex-col h-screen overflow-hidden w-full">
                 {/* Header */}
-                <header className="bg-white shadow-sm px-4 md:px-8 py-4 flex items-center justify-between z-10">
+                <header className="bg-white dark:bg-slate-800 shadow-sm px-4 md:px-8 py-4 flex items-center justify-between z-10">
                     <div className="flex items-center gap-3 md:gap-4">
                         <button 
-                            className="md:hidden p-2 -ml-2 text-gray-600 hover:text-[#042954] transition-colors"
+                            className="md:hidden p-2 -ml-2 text-gray-600 dark:text-slate-300 hover:text-[#042954] dark:text-white transition-colors"
                             onClick={() => setIsMobileMenuOpen(true)}
                         >
                             <Menu size={24} />
                         </button>
-                        <h1 className="text-lg md:text-2xl font-bold text-[#042954] truncate max-w-[150px] sm:max-w-max">{pageTitle}</h1>
+                        <h1 className="text-lg md:text-2xl font-bold text-[#042954] dark:text-white truncate max-w-[150px] sm:max-w-max">{pageTitle}</h1>
                         <span className="hidden sm:inline-block px-3 py-1 bg-[#e3f2fd] text-[#03a9f4] text-xs font-bold rounded-full">
                             Espace {displayRole}
                         </span>
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <button className="p-2 text-gray-400 hover:text-[#ffa000] transition-colors relative">
-                            <Bell size={20} />
-                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-400 border-2 border-white rounded-full"></span>
-                        </button>
+                        <ThemeToggle />
                          {role === "ROLE_ADMIN" ? (
                              <div className="flex items-center gap-3 border-l pl-4">
                                 <div className="hidden sm:block text-right">
-                                    <p className="text-sm font-bold text-[#333333]">{userName}</p>
-                                    <p className="text-xs text-gray-500 font-medium">{displayRole}</p>
+                                    <p className="text-sm font-bold text-[#333333] dark:text-slate-100">{userName}</p>
+                                    <p className="text-xs text-gray-500 dark:text-slate-400 font-medium">{displayRole}</p>
                                 </div>
                                 <div className="w-10 h-10 rounded-full bg-[#042954] flex items-center justify-center text-white font-bold shadow-md uppercase overflow-hidden border-2 border-white">
                                     {userPhoto ? (
@@ -230,8 +226,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                          ) : (
                             <Link href="/dashboard/profile" className="flex items-center gap-3 border-l pl-4 hover:opacity-80 transition-opacity">
                                 <div className="hidden sm:block text-right">
-                                    <p className="text-sm font-bold text-[#333333]">{userName}</p>
-                                    <p className="text-xs text-gray-500 font-medium">{displayRole}</p>
+                                    <p className="text-sm font-bold text-[#333333] dark:text-slate-100">{userName}</p>
+                                    <p className="text-xs text-gray-500 dark:text-slate-400 font-medium">{displayRole}</p>
                                 </div>
                                 <div className="w-10 h-10 rounded-full bg-[#042954] flex items-center justify-center text-white font-bold shadow-md cursor-pointer hover:bg-[#03a9f4] transition-colors uppercase overflow-hidden border-2 border-white">
                                 {userPhoto ? (

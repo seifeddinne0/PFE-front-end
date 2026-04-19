@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const API_URL = "http://localhost:8080";
 
@@ -24,6 +24,7 @@ interface UserProfile {
 
 export default function ProfilePage() {
     const router = useRouter();
+    const pathname = usePathname();
     const [user, setUser] = useState<UserProfile | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -62,7 +63,15 @@ export default function ProfilePage() {
         try {
             const role = sessionStorage.getItem("role");
             if (role === "ROLE_ADMIN") {
-                router.push("/dashboard");
+                router.push("/admin/dashboard");
+                return;
+            }
+            if (role === "ROLE_ENSEIGNANT" && pathname === "/dashboard/profile") {
+                router.push("/enseignant/profile");
+                return;
+            }
+            if (role === "ROLE_ETUDIANT" && pathname === "/dashboard/profile") {
+                router.push("/etudiant/profile");
                 return;
             }
 
@@ -84,7 +93,7 @@ export default function ProfilePage() {
 
     useEffect(() => {
         fetchProfile();
-    }, []);
+    }, [pathname]);
 
     // --- Personal Info Handlers ---
     const handleInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -230,8 +239,8 @@ export default function ProfilePage() {
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <Loader2 className="h-12 w-12 animate-spin text-[#042954]" />
-                <p className="text-gray-500 font-medium">Chargement de votre profil...</p>
+                <Loader2 className="h-12 w-12 animate-spin text-[#042954] dark:text-white" />
+                <p className="text-gray-500 dark:text-slate-400 font-medium">Chargement de votre profil...</p>
             </div>
         );
     }
@@ -239,14 +248,14 @@ export default function ProfilePage() {
     return (
         <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
             <div>
-                <h1 className="text-3xl font-extrabold text-[#042954] tracking-tight">Mon Profil</h1>
-                <p className="text-gray-500 mt-1">Gérez vos informations personnelles et la sécurité de votre compte.</p>
+                <h1 className="text-3xl font-extrabold text-[#042954] dark:text-white tracking-tight">Mon Profil</h1>
+                <p className="text-gray-500 dark:text-slate-400 mt-1">Gérez vos informations personnelles et la sécurité de votre compte.</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* ─── LEFT: PHOTO SECTION ─── */}
                 <div className="lg:col-span-1 space-y-6">
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 flex flex-col items-center text-center">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-8 flex flex-col items-center text-center">
                         <div className="relative group cursor-pointer mb-6" onClick={handlePhotoClick}>
                             <div className={`w-[140px] h-[140px] rounded-full border-4 border-white shadow-xl overflow-hidden flex items-center justify-center transition-transform group-hover:scale-105 ${!user?.photo ? 'bg-[#042954]' : ''}`}>
                                 {isUploading ? (
@@ -263,7 +272,7 @@ export default function ProfilePage() {
                                         onError={() => setImgError(true)}
                                     />
                                 ) : (
-                                    <span className="text-4xl font-black text-white">{getInitials()}</span>
+                                    <span className="text-[#042954] dark:text-whitexl font-black text-white">{getInitials()}</span>
                                 )}
 
                                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -283,12 +292,12 @@ export default function ProfilePage() {
                             />
                         </div>
 
-                        <h2 className="text-2xl font-bold text-[#042954] mb-1">{user?.prenom} {user?.nom}</h2>
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
+                        <h2 className="text-[#042954] dark:text-whitexl font-bold text-[#042954] dark:text-white mb-1">{user?.prenom} {user?.nom}</h2>
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
                             <ShieldCheck size={14} />
                             Espace {getDisplayRole()}
                         </div>
-                        <p className="text-gray-400 text-sm mb-6">{user?.email}</p>
+                        <p className="text-gray-400 dark:text-slate-500 text-sm mb-6">{user?.email}</p>
 
                         <button 
                             onClick={handlePhotoClick}
@@ -300,7 +309,7 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="bg-gradient-to-br from-[#042954] to-[#03a9f4] rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 dark:bg-slate-800/50 rounded-full -mr-16 -mt-16 blur-2xl"></div>
                         <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
                             <BadgeCheck className="text-[#ffa000]" />
                             Compte Vérifié
@@ -315,18 +324,18 @@ export default function ProfilePage() {
                 <div className="lg:col-span-2 space-y-8">
                     
                     {/* Section 2: Informations personnelles */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-gray-100 dark:border-slate-700/50 flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                                <div className="p-3 bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-xl">
                                     <User size={24} />
                                 </div>
-                                <h3 className="text-xl font-bold text-[#042954]">Informations personnelles</h3>
+                                <h3 className="text-xl font-bold text-[#042954] dark:text-white">Informations personnelles</h3>
                             </div>
                             {!isEditing && (
                                 <button 
                                     onClick={() => setIsEditing(true)}
-                                    className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                                    className="px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-bold text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:bg-slate-800/50 transition-colors"
                                 >
                                     Modifier
                                 </button>
@@ -336,7 +345,7 @@ export default function ProfilePage() {
                         <form onSubmit={handleInfoSubmit} className="p-8">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                                         Nom
                                     </label>
                                     {isEditing ? (
@@ -346,15 +355,15 @@ export default function ProfilePage() {
                                             value={formData.nom}
                                             onChange={handleInfoChange}
                                             required
-                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all"
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:focus:bg-slate-700 transition-all dark:text-white"
                                         />
                                     ) : (
-                                        <p className="text-gray-900 font-medium px-4 py-3 bg-gray-50 rounded-xl border border-transparent">{user?.nom}</p>
+                                        <p className="text-gray-900 dark:text-gray-100 font-medium px-4 py-3 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-transparent dark:border-gray-700">{user?.nom}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700">Prénom</label>
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Prénom</label>
                                     {isEditing ? (
                                         <input 
                                             type="text" 
@@ -362,15 +371,15 @@ export default function ProfilePage() {
                                             value={formData.prenom}
                                             onChange={handleInfoChange}
                                             required
-                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all"
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:focus:bg-slate-700 transition-all dark:text-white"
                                         />
                                     ) : (
-                                        <p className="text-gray-900 font-medium px-4 py-3 bg-gray-50 rounded-xl border border-transparent">{user?.prenom}</p>
+                                        <p className="text-gray-900 dark:text-gray-100 font-medium px-4 py-3 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-transparent dark:border-gray-700">{user?.prenom}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                                         Téléphone
                                     </label>
                                     {isEditing ? (
@@ -380,18 +389,18 @@ export default function ProfilePage() {
                                             value={formData.telephone}
                                             onChange={handleInfoChange}
                                             placeholder="Ex: 21 000 000"
-                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all"
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:focus:bg-slate-700 transition-all dark:text-white"
                                         />
                                     ) : (
-                                        <p className="text-gray-900 font-medium px-4 py-3 bg-gray-50 rounded-xl border border-transparent">
-                                            {user?.telephone || <span className="text-gray-400 italic font-normal">Non renseigné</span>}
+                                        <p className="text-gray-900 dark:text-gray-100 font-medium px-4 py-3 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-transparent dark:border-gray-700">
+                                            {user?.telephone || <span className="text-gray-400 dark:text-slate-500 italic font-normal">Non renseigné</span>}
                                         </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700">Adresse Email (lecture seule)</label>
-                                    <p className="flex items-center gap-2 text-gray-500 font-medium px-4 py-3 bg-gray-100 rounded-xl border border-gray-100 cursor-not-allowed">
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Adresse Email (lecture seule)</label>
+                                    <p className="flex items-center gap-2 text-gray-500 dark:text-slate-400 font-medium px-4 py-3 bg-gray-100 dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 cursor-not-allowed text-gray-500 dark:text-gray-400">
                                         <Mail size={16} />
                                         {user?.email}
                                     </p>
@@ -399,11 +408,11 @@ export default function ProfilePage() {
                             </div>
 
                             {isEditing && (
-                                <div className="mt-10 pt-6 border-t border-gray-100 flex items-center justify-end gap-4">
+                                <div className="mt-10 pt-6 border-t border-gray-100 dark:border-slate-700 flex items-center justify-end gap-4">
                                     <button 
                                         type="button" 
                                         onClick={cancelEditing}
-                                        className="px-6 py-2.5 font-bold text-gray-500 hover:bg-gray-50 rounded-lg transition-colors"
+                                        className="px-6 py-2.5 font-bold text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:bg-slate-800/50 rounded-lg transition-colors"
                                     >
                                         Annuler
                                     </button>
@@ -421,18 +430,18 @@ export default function ProfilePage() {
                     </div>
 
                     {/* Section 3: Changer mot de passe */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 flex items-center gap-4">
-                            <div className="p-3 bg-orange-50 text-orange-600 rounded-xl">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-gray-100 dark:border-slate-700/50 flex items-center gap-4">
+                            <div className="p-3 bg-orange-50 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 rounded-xl">
                                 <Lock size={24} />
                             </div>
-                            <h3 className="text-xl font-bold text-[#042954]">Sécurité & Mot de passe</h3>
+                            <h3 className="text-xl font-bold text-[#042954] dark:text-white">Sécurité & Mot de passe</h3>
                         </div>
 
                         <form onSubmit={handlePasswordSubmit} className="p-8 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="md:col-span-2 space-y-2">
-                                    <label className="text-sm font-bold text-gray-700">Ancien mot de passe</label>
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Ancien mot de passe</label>
                                     <div className="relative">
                                         <input 
                                             type={showPasswords.ancien ? "text" : "password"}
@@ -440,12 +449,12 @@ export default function ProfilePage() {
                                             value={passwordData.ancienPassword}
                                             onChange={handlePasswordChange}
                                             required
-                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all pr-12"
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:focus:bg-slate-700 transition-all dark:text-white pr-12 dark:text-white"
                                         />
                                         <button 
                                             type="button"
                                             onClick={() => setShowPasswords({...showPasswords, ancien: !showPasswords.ancien})}
-                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:text-slate-300"
                                         >
                                             {showPasswords.ancien ? <EyeOff size={18} /> : <Eye size={18} />}
                                         </button>
@@ -453,7 +462,7 @@ export default function ProfilePage() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700">Nouveau mot de passe</label>
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Nouveau mot de passe</label>
                                     <div className="relative">
                                         <input 
                                             type={showPasswords.nouveau ? "text" : "password"}
@@ -461,21 +470,21 @@ export default function ProfilePage() {
                                             value={passwordData.nouveauPassword}
                                             onChange={handlePasswordChange}
                                             required
-                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all pr-12"
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:focus:bg-slate-700 transition-all dark:text-white pr-12 dark:text-white"
                                         />
                                         <button 
                                             type="button"
                                             onClick={() => setShowPasswords({...showPasswords, nouveau: !showPasswords.nouveau})}
-                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:text-slate-300"
                                         >
                                             {showPasswords.nouveau ? <EyeOff size={18} /> : <Eye size={18} />}
                                         </button>
                                     </div>
-                                    <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-wider font-bold">Minimum 6 caractères</p>
+                                    <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1 uppercase tracking-wider font-bold">Minimum 6 caractères</p>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold text-gray-700">Confirmer le nouveau mot de passe</label>
+                                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Confirmer le nouveau mot de passe</label>
                                     <div className="relative">
                                         <input 
                                             type={showPasswords.confirm ? "text" : "password"}
@@ -483,12 +492,12 @@ export default function ProfilePage() {
                                             value={passwordData.confirmPassword}
                                             onChange={handlePasswordChange}
                                             required
-                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all pr-12"
+                                            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:focus:bg-slate-700 transition-all dark:text-white pr-12 dark:text-white"
                                         />
                                         <button 
                                             type="button"
                                             onClick={() => setShowPasswords({...showPasswords, confirm: !showPasswords.confirm})}
-                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:text-slate-300"
                                         >
                                             {showPasswords.confirm ? <EyeOff size={18} /> : <Eye size={18} />}
                                         </button>

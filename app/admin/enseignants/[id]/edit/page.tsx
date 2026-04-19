@@ -95,23 +95,23 @@ export default function EditEnseignantPage() {
             <div className="flex items-center gap-4 mb-8">
                 <Link
                     href="/admin/enseignants"
-                    className="p-2 bg-white rounded-full border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm text-gray-500"
+                    className="p-2 bg-white dark:bg-slate-800 rounded-full border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:bg-slate-800/50 transition-colors shadow-sm text-gray-500 dark:text-slate-400"
                 >
                     <ArrowLeft size={20} />
                 </Link>
                 <div>
-                    <h1 className="text-2xl font-bold text-[#042954] tracking-tight">Modifier un enseignant</h1>
-                    <p className="text-sm text-gray-500">Mettez à jour les informations du profil ({formData.prenom} {formData.nom})</p>
+                    <h1 className="text-[#042954] dark:text-whitexl font-bold text-[#042954] dark:text-white tracking-tight">Modifier un enseignant</h1>
+                    <p className="text-sm text-gray-500 dark:text-slate-400">Mettez à jour les informations du profil ({formData.prenom} {formData.nom})</p>
                 </div>
             </div>
 
             {/* Form */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8">
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm p-8">
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Nom */}
                         <div className="space-y-2">
-                            <label htmlFor="nom" className="text-sm font-bold text-[#333333]">Nom <span className="text-red-500">*</span></label>
+                            <label htmlFor="nom" className="text-sm font-bold text-[#333333] dark:text-slate-100">Nom <span className="text-red-500">*</span></label>
                             <input
                                 id="nom"
                                 name="nom"
@@ -119,13 +119,13 @@ export default function EditEnseignantPage() {
                                 required
                                 value={formData.nom}
                                 onChange={handleChange}
-                                className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm"
+                                className="w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm"
                             />
                         </div>
 
                         {/* Prénom */}
                         <div className="space-y-2">
-                            <label htmlFor="prenom" className="text-sm font-bold text-[#333333]">Prénom <span className="text-red-500">*</span></label>
+                            <label htmlFor="prenom" className="text-sm font-bold text-[#333333] dark:text-slate-100">Prénom <span className="text-red-500">*</span></label>
                             <input
                                 id="prenom"
                                 name="prenom"
@@ -133,13 +133,13 @@ export default function EditEnseignantPage() {
                                 required
                                 value={formData.prenom}
                                 onChange={handleChange}
-                                className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm"
+                                className="w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm"
                             />
                         </div>
 
                         {/* Email */}
                         <div className="space-y-2">
-                            <label htmlFor="email" className="text-sm font-bold text-[#333333]">Adresse Email <span className="text-red-500">*</span></label>
+                            <label htmlFor="email" className="text-sm font-bold text-[#333333] dark:text-slate-100">Adresse Email <span className="text-red-500">*</span></label>
                             <input
                                 id="email"
                                 name="email"
@@ -147,13 +147,13 @@ export default function EditEnseignantPage() {
                                 required
                                 value={formData.email}
                                 onChange={handleChange}
-                                className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm"
+                                className="w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm"
                             />
                         </div>
 
                         {/* Nouveau mot de passe */}
                         <div className="space-y-2">
-                            <label htmlFor="password" className="text-sm font-bold text-[#333333]">Nouveau mot de passe</label>
+                            <label htmlFor="password" className="text-sm font-bold text-[#333333] dark:text-slate-100">Nouveau mot de passe</label>
                             <div className="relative">
                                 <input
                                     id="password"
@@ -161,13 +161,13 @@ export default function EditEnseignantPage() {
                                     type={showPassword ? "text" : "password"}
                                     value={formData.password}
                                     onChange={handleChange}
-                                    className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm pr-12"
+                                    className="w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm pr-12"
                                     placeholder="Laisser vide pour ne pas changer"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:text-slate-300 transition-colors"
                                 >
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
@@ -176,54 +176,54 @@ export default function EditEnseignantPage() {
 
                         {/* Téléphone */}
                         <div className="space-y-2">
-                            <label htmlFor="telephone" className="text-sm font-bold text-[#333333]">Téléphone</label>
+                            <label htmlFor="telephone" className="text-sm font-bold text-[#333333] dark:text-slate-100">Téléphone</label>
                             <input
                                 id="telephone"
                                 name="telephone"
                                 type="tel"
                                 value={formData.telephone}
                                 onChange={handleChange}
-                                className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm"
+                                className="w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm"
                             />
                         </div>
 
                         {/* Date de naissance */}
                         <div className="space-y-2">
-                            <label htmlFor="dateNaissance" className="text-sm font-bold text-[#333333]">Date de Naissance</label>
+                            <label htmlFor="dateNaissance" className="text-sm font-bold text-[#333333] dark:text-slate-100">Date de Naissance</label>
                             <input
                                 id="dateNaissance"
                                 name="dateNaissance"
                                 type="date"
                                 value={formData.dateNaissance}
                                 onChange={handleChange}
-                                className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm text-gray-700"
+                                className="w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm text-gray-700"
                             />
                         </div>
 
                         {/* Spécialité */}
                         <div className="space-y-2">
-                            <label htmlFor="specialite" className="text-sm font-bold text-[#333333]">Spécialité</label>
+                            <label htmlFor="specialite" className="text-sm font-bold text-[#333333] dark:text-slate-100">Spécialité</label>
                             <input
                                 id="specialite"
                                 name="specialite"
                                 type="text"
                                 value={formData.specialite}
                                 onChange={handleChange}
-                                className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm"
+                                className="w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm"
                                 placeholder="ex: Informatique, Mathématiques..."
                             />
                         </div>
 
                         {/* Grade */}
                         <div className="space-y-2">
-                            <label htmlFor="grade" className="text-sm font-bold text-[#333333]">Grade</label>
+                            <label htmlFor="grade" className="text-sm font-bold text-[#333333] dark:text-slate-100">Grade</label>
                             <input
                                 id="grade"
                                 name="grade"
                                 type="text"
                                 value={formData.grade}
                                 onChange={handleChange}
-                                className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm"
+                                className="w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm"
                                 placeholder="ex: Professeur, Maître de conférences..."
                             />
                         </div>
@@ -231,22 +231,22 @@ export default function EditEnseignantPage() {
 
                     {/* Adresse */}
                     <div className="space-y-2">
-                        <label htmlFor="adresse" className="text-sm font-bold text-[#333333]">Adresse Complète</label>
+                        <label htmlFor="adresse" className="text-sm font-bold text-[#333333] dark:text-slate-100">Adresse Complète</label>
                         <textarea
                             id="adresse"
                             name="adresse"
                             rows={3}
                             value={formData.adresse}
                             onChange={handleChange}
-                            className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm resize-none"
+                            className="w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm resize-none"
                         ></textarea>
                     </div>
 
                     {/* Actions */}
-                    <div className="pt-6 border-t border-gray-100 flex items-center justify-end gap-4">
+                    <div className="pt-6 border-t border-gray-100 dark:border-slate-700 flex items-center justify-end gap-4">
                         <Link
                             href="/admin/enseignants"
-                            className="px-6 py-3 font-semibold text-gray-500 hover:bg-gray-50 rounded-lg transition-colors text-sm"
+                            className="px-6 py-3 font-semibold text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:bg-slate-800/50 rounded-lg transition-colors text-sm"
                         >
                             Annuler
                         </Link>

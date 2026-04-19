@@ -1,16 +1,17 @@
 import Link from "next/link";
 import { GraduationCap, Users, BookOpen, Calendar, ArrowRight, CheckCircle, Monitor, Shield, Award } from "lucide-react";
+import ThemeToggle from "@/app/components/ThemeToggle";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen font-sans bg-[#f0f1f3] text-[#333333]">
+    <div className="min-h-screen font-sans bg-[#f0f1f3] dark:bg-slate-900 text-[#333333] dark:text-slate-100">
       {/* Navigation */}
       <nav className="bg-[#042954] text-white py-4 px-6 md:px-12 flex items-center justify-between sticky top-0 z-50 shadow-md">
         <div className="flex items-center gap-2">
           <div className="bg-[#ffa000] p-2 rounded shadow-sm">
             <GraduationCap size={24} className="text-white" />
           </div>
-          <span className="text-2xl font-bold tracking-tight">Gestion<span className="font-light text-white/80">Ac</span></span>
+          <span className="text-[#042954] dark:text-whitexl font-bold tracking-tight">Gestion<span className="font-light text-white/80">Ac</span></span>
         </div>
 
         <div className="hidden md:flex items-center gap-8 text-sm font-medium">
@@ -20,6 +21,7 @@ export default function LandingPage() {
         </div>
 
         <div className="flex items-center gap-4">
+          <ThemeToggle />
           <Link href="/login" className="text-sm font-bold bg-[#ffa000] text-white px-5 py-2.5 rounded hover:bg-[#ff8f00] transition-colors shadow-sm flex items-center gap-2">
             Se Connecter <ArrowRight size={16} />
           </Link>
@@ -27,13 +29,13 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section id="accueil" className="bg-white py-20 px-6 md:px-12 border-b border-gray-200">
+      <section id="accueil" className="bg-white dark:bg-slate-800 py-20 px-6 md:px-12 border-b border-gray-200 dark:border-slate-700">
         <div className="container mx-auto max-w-6xl flex flex-col md:flex-row items-center gap-12">
           <div className="flex-1 space-y-8">
-            <h1 className="text-4xl md:text-6xl font-extrabold text-[#042954] leading-tight">
+            <h1 className="text-[#042954] dark:text-whitexl md:text-6xl font-extrabold text-[#042954] dark:text-white leading-tight">
               L&apos;excellence éducative <br />pour <span className="text-[#ffa000]">étudiants</span> et <span className="text-[#03a9f4]">professeurs</span>
             </h1>
-            <p className="text-lg text-gray-600 max-w-xl leading-relaxed">
+            <p className="text-lg text-gray-600 dark:text-slate-300 max-w-xl leading-relaxed">
               Un système de gestion scolaire complet, intuitif et moderne. Simplifiez la vie de votre établissement avec des outils pensés pour la réussite de tous.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
@@ -67,58 +69,58 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section id="fonctionnalites" className="py-20 px-6 md:px-12 bg-[#f0f1f3]">
+      <section id="fonctionnalites" className="py-20 px-6 md:px-12 bg-[#f0f1f3] dark:bg-slate-900">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold text-[#042954] mb-4">Fonctionnalités Principales</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto text-lg">Tout ce dont votre institut académique a besoin, consolidé dans une interface unique au design épuré.</p>
+            <h2 className="text-3xl md:text-[#042954] dark:text-whitexl font-bold text-[#042954] dark:text-white mb-4">Fonctionnalités Principales</h2>
+            <p className="text-gray-600 dark:text-slate-300 max-w-2xl mx-auto text-lg">Tout ce dont votre institut académique a besoin, consolidé dans une interface unique au design épuré.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
             {/* Feature 1 */}
-            <div className="bg-white p-8 rounded border-t-4 border-[#4caf50] shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-white dark:bg-slate-800 p-8 rounded border-t-4 border-[#4caf50] shadow-sm hover:shadow-md transition-shadow">
               <div className="bg-[#4caf50]/10 w-16 h-16 rounded flex items-center justify-center mb-6 text-[#4caf50]">
                 <Calendar size={32} />
               </div>
-              <h3 className="text-xl font-bold text-[#333333] mb-3">Absences & Justificatifs</h3>
-              <p className="text-gray-600">Suivi de l&apos;assiduité et dépôt en ligne des justificatifs d&apos;absence.</p>
+              <h3 className="text-xl font-bold text-[#333333] dark:text-slate-100 mb-3">Absences & Justificatifs</h3>
+              <p className="text-gray-600 dark:text-slate-300">Suivi de l&apos;assiduité et dépôt en ligne des justificatifs d&apos;absence.</p>
             </div>
 
             {/* Feature 2 */}
-            <div className="bg-white p-8 rounded border-t-4 border-[#03a9f4] shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-white dark:bg-slate-800 p-8 rounded border-t-4 border-[#03a9f4] shadow-sm hover:shadow-md transition-shadow">
               <div className="bg-[#03a9f4]/10 w-16 h-16 rounded flex items-center justify-center mb-6 text-[#03a9f4]">
                 <Award size={32} />
               </div>
-              <h3 className="text-xl font-bold text-[#333333] mb-3">Notes & Bulletins</h3>
-              <p className="text-gray-600">Consultation des résultats et téléchargement des bulletins de notes officiels en PDF.</p>
+              <h3 className="text-xl font-bold text-[#333333] dark:text-slate-100 mb-3">Notes & Bulletins</h3>
+              <p className="text-gray-600 dark:text-slate-300">Consultation des résultats et téléchargement des bulletins de notes officiels en PDF.</p>
             </div>
 
             {/* Feature 3 */}
-            <div className="bg-white p-8 rounded border-t-4 border-[#f44336] shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-white dark:bg-slate-800 p-8 rounded border-t-4 border-[#f44336] shadow-sm hover:shadow-md transition-shadow">
               <div className="bg-[#f44336]/10 w-16 h-16 rounded flex items-center justify-center mb-6 text-[#f44336]">
                 <BookOpen size={32} />
               </div>
-              <h3 className="text-xl font-bold text-[#333333] mb-3">Gestion des Notes</h3>
-              <p className="text-gray-600">Saisie rapide et sécurisée des notes par classe et par matière.</p>
+              <h3 className="text-xl font-bold text-[#333333] dark:text-slate-100 mb-3">Gestion des Notes</h3>
+              <p className="text-gray-600 dark:text-slate-300">Saisie rapide et sécurisée des notes par classe et par matière.</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* Target Audience Section */}
-      <section id="pour-qui" className="py-20 px-6 md:px-12 bg-white border-t border-gray-200">
+      <section id="pour-qui" className="py-20 px-6 md:px-12 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700">
         <div className="container mx-auto max-w-6xl">
           <div className="grid md:grid-cols-2 gap-16 items-center">
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-[#042954] mb-6">Conçu pour unir<br />étudiants et enseignants</h2>
+              <h2 className="text-3xl md:text-[#042954] dark:text-whitexl font-bold text-[#042954] dark:text-white mb-6">Conçu pour unir<br />étudiants et enseignants</h2>
               <div className="space-y-6">
                 <div className="flex gap-4">
                   <div className="mt-1 bg-[#ffa000] text-white rounded-full p-1 flex-shrink-0 w-6 h-6 flex items-center justify-center">
                     <CheckCircle size={14} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-lg text-[#333333]">Pour les Étudiants</h4>
-                    <p className="text-gray-600 mt-1">Une vue claire sur leur progression académique, un accès facile aux devoirs et une messagerie intégrée pour garder le contact avec leurs professeurs.</p>
+                    <h4 className="font-bold text-lg text-[#333333] dark:text-slate-100">Pour les Étudiants</h4>
+                    <p className="text-gray-600 dark:text-slate-300 mt-1">Une vue claire sur leur progression académique, un accès facile aux devoirs et une messagerie intégrée pour garder le contact avec leurs professeurs.</p>
                   </div>
                 </div>
                 <div className="flex gap-4">
@@ -126,8 +128,8 @@ export default function LandingPage() {
                     <CheckCircle size={14} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-lg text-[#333333]">Pour les Enseignants</h4>
-                    <p className="text-gray-600 mt-1">Moins de papier, plus de temps pour l&apos;enseignement. Automatisez les calculs de moyennes et publiez les leçons en un clic.</p>
+                    <h4 className="font-bold text-lg text-[#333333] dark:text-slate-100">Pour les Enseignants</h4>
+                    <p className="text-gray-600 dark:text-slate-300 mt-1">Moins de papier, plus de temps pour l&apos;enseignement. Automatisez les calculs de moyennes et publiez les leçons en un clic.</p>
                   </div>
                 </div>
                 <div className="flex gap-4">
@@ -135,8 +137,8 @@ export default function LandingPage() {
                     <CheckCircle size={14} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-lg text-[#333333]">Pour l&apos;Administration</h4>
-                    <p className="text-gray-600 mt-1">Gérez facilement les classes, les matières, les paiements de frais de scolarité et l&apos;emploi du temps global de l&apos;établissement.</p>
+                    <h4 className="font-bold text-lg text-[#333333] dark:text-slate-100">Pour l&apos;Administration</h4>
+                    <p className="text-gray-600 dark:text-slate-300 mt-1">Gérez facilement les classes, les matières, les paiements de frais de scolarité et l&apos;emploi du temps global de l&apos;établissement.</p>
                   </div>
                 </div>
               </div>
@@ -146,16 +148,16 @@ export default function LandingPage() {
               <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#03a9f4]/20 blur-[60px]" />
 
               <div className="relative z-10">
-                <h3 className="text-2xl font-bold mb-4">Rejoignez la révolution numérique</h3>
+                <h3 className="text-[#042954] dark:text-whitexl font-bold mb-4">Rejoignez la révolution numérique</h3>
                 <p className="mb-8 text-white/80">
                   Notre mission est de vous offrir la meilleure expérience numérique pour optimiser votre gestion quotidienne.
                 </p>
                 <div className="space-y-4">
-                  <div className="bg-white/10 backdrop-blur-sm p-4 rounded flex items-center justify-between border border-white/10">
+                  <div className="bg-white/10 dark:bg-slate-800/50 backdrop-blur-sm p-4 rounded flex items-center justify-between border border-white/10">
                     <span className="font-semibold">Bien-être et motivation (Étudiants)</span>
                     <span className="text-[#ffa000] font-bold text-xl">94%</span>
                   </div>
-                  <div className="bg-white/10 backdrop-blur-sm p-4 rounded flex items-center justify-between border border-white/10">
+                  <div className="bg-white/10 dark:bg-slate-800/50 backdrop-blur-sm p-4 rounded flex items-center justify-between border border-white/10">
                     <span className="font-semibold">Sérénité et satisfaction (Enseignants)</span>
                     <span className="text-[#4caf50] font-bold text-xl">98%</span>
                   </div>
@@ -169,7 +171,7 @@ export default function LandingPage() {
       {/* Call to Action */}
       <section className="py-24 px-6 text-center bg-[#ffa000]">
         <div className="container mx-auto max-w-4xl relative z-10">
-          <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 tracking-tight">Votre espace académique vous attend</h2>
+          <h2 className="text-[#042954] dark:text-whitexl md:text-[#042954] dark:text-whitexl font-bold text-white mb-6 tracking-tight">Votre espace académique vous attend</h2>
           <p className="text-xl text-white/90 mb-10 max-w-2xl mx-auto">
             Embarquez dans une nouvelle ère de l&apos;éducation. Connectez-vous dès maintenant pour vivre une expérience académique fluide, connectée et enrichissante.
           </p>

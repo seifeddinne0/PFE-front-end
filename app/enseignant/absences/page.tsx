@@ -1,552 +1,687 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Save, Edit2, Trash2, X, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import FullCalendar from "@fullcalendar/react";
+import timeGridPlugin from "@fullcalendar/timegrid";
+import interactionPlugin from "@fullcalendar/interaction";
+import frLocale from "@fullcalendar/core/locales/fr";
+import {
+    Calendar,
+    AlertTriangle,
+    Users,
+    Check,
+    Save,
+    X,
+    Clock,
+    Filter,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+
+interface Seance {
+    id: number;
+    jourSemaine: "LUNDI" | "MARDI" | "MERCREDI" | "JEUDI" | "VENDREDI" | "SAMEDI";
+    heureDebut: string;
+    heureFin: string;
+    salle?: string;
+    matiereId: number;
+    matiereNom: string;
+    matiereCode?: string;
+    classeId: number;
+    classeCode: string;
+    classeNom?: string;
+    enseignantId: number;
+    enseignantNom: string;
+}
 
 interface Etudiant {
     id: number;
     matricule: string;
     nom: string;
     prenom: string;
+    email: string;
+    classeCode: string;
 }
 
-interface Matiere {
-    id: number;
-    nom: string;
-    code: string;
-}
-
-interface Absence {
+interface AbsenceRecord {
     id: number;
     etudiantId: number;
-    etudiantNom: string;
-    etudiantPrenom: string;
-    matiereId: number;
-    matiere: string;
+    seanceId: number;
     dateAbsence: string;
-    statut: string;
-    motif: string;
-    alerte: boolean;
 }
 
-const emptyForm = {
-    etudiantId: "",
-    matiereId: "",
-    dateAbsence: new Date().toISOString().split('T')[0], // Default today
-    statut: "NON_JUSTIFIEE",
-    motif: ""
+interface FiliereItem {
+    id: number;
+    code: string;
+    nom: string;
+}
+
+interface ClasseItem {
+    id: number;
+    code: string;
+    nom: string;
+    niveauCode: string;
+    filiereCode: string;
+}
+
+interface AgendaAbsenceResponse {
+    filiereCode?: string;
+    niveauCode?: string;
+    semestreActif?: string;
+    blocked: boolean;
+    message?: string;
+    seances: Seance[];
+}
+
+interface CalendarEvent {
+    id: string;
+    title: string;
+    start: string;
+    end: string;
+    extendedProps: {
+        seance: Seance;
+    };
+}
+
+interface VacationBackgroundEvent {
+    id: string;
+    start: string;
+    end: string;
+    display: "background";
+    backgroundColor: string;
+    borderColor: string;
+}
+
+const DAY_TO_INDEX: Record<Seance["jourSemaine"], number> = {
+    LUNDI: 1,
+    MARDI: 2,
+    MERCREDI: 3,
+    JEUDI: 4,
+    VENDREDI: 5,
+    SAMEDI: 6,
 };
+
+const NIVEAUX_LCS = ["LCS1", "LCS2", "LCS3"];
+
+function formatISODate(value: Date): string {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function toTimeHHMM(value: string): string {
+    return value.substring(0, 5);
+}
+
+function getMonday(date: Date): Date {
+    const clone = new Date(date);
+    const day = clone.getDay();
+    const diff = clone.getDate() - day + (day === 0 ? -6 : 1);
+    clone.setDate(diff);
+    clone.setHours(0, 0, 0, 0);
+    return clone;
+}
+
+function addDays(date: Date, days: number): Date {
+    const clone = new Date(date);
+    clone.setDate(clone.getDate() + days);
+    return clone;
+}
+
+function toEventDateTime(date: Date, time: string): string {
+    const hhmm = toTimeHHMM(time);
+    const day = formatISODate(date);
+    return `${day}T${hhmm}:00`;
+}
+
+function formatSemestreLabel(semestre?: string): string {
+    if (!semestre) return "-";
+    if (semestre === "STAGE_PFE") return "Stage PFE";
+    return semestre;
+}
+
+function isVacationDate(value: Date): boolean {
+    const year = value.getFullYear();
+
+    const janStart = new Date(year, 0, 1);
+    const janEnd = new Date(year, 0, 15);
+
+    const marStart = new Date(year, 2, 15);
+    const marEnd = new Date(year, 2, 31);
+
+    const mayStart = new Date(year, 4, 30);
+    const sepEnd = new Date(year, 8, 12);
+
+    const day = new Date(value);
+    day.setHours(0, 0, 0, 0);
+
+    const inJanVacation = day >= janStart && day <= janEnd;
+    const inMarVacation = day >= marStart && day <= marEnd;
+    const inSummerVacation = day >= mayStart && day <= sepEnd;
+
+    return inJanVacation || inMarVacation || inSummerVacation;
+}
 
 export default function EnseignantAbsencesPage() {
     const router = useRouter();
+
+    const [loading, setLoading] = useState(true);
+    const [filieres, setFilieres] = useState<FiliereItem[]>([]);
+    const [classes, setClasses] = useState<ClasseItem[]>([]);
+
+    const [selectedFiliere, setSelectedFiliere] = useState("LCS");
+    const [selectedNiveau, setSelectedNiveau] = useState("LCS1");
+
+    const [agenda, setAgenda] = useState<AgendaAbsenceResponse | null>(null);
+    const [weekAnchor, setWeekAnchor] = useState<Date>(getMonday(new Date()));
+
+    const [selectedSeance, setSelectedSeance] = useState<Seance | null>(null);
+    const [selectedDate, setSelectedDate] = useState("");
     const [etudiants, setEtudiants] = useState<Etudiant[]>([]);
-    const [matieres, setMatieres] = useState<Matiere[]>([]);
-    const [absences, setAbsences] = useState<Absence[]>([]);
-    const [isFetchingData, setIsFetchingData] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [absentIds, setAbsentIds] = useState<Set<number>>(new Set());
+    const [existingAbsences, setExistingAbsences] = useState<AbsenceRecord[]>([]);
 
-    // Pagination
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(5);
+    const [loadingModal, setLoadingModal] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
-    // Forms
-    const [formData, setFormData] = useState({ ...emptyForm });
+    const availableNiveaux = useMemo(() => {
+        return NIVEAUX_LCS;
+    }, []);
 
-    // Edit Modal
-    const [editingAbsence, setEditingAbsence] = useState<Absence | null>(null);
-    const [editForm, setEditForm] = useState({ ...emptyForm });
-    const [isEditing, setIsEditing] = useState(false);
+    const scheduleEvents: CalendarEvent[] = useMemo(() => {
+        if (!agenda?.seances?.length) return [];
 
-    // --- Data fetching ---
-    const fetchDropdowns = async () => {
-        try {
-            const [etudiantsData, matieresData] = await Promise.all([
-                api.get("/api/admin/etudiants"),
-                api.get("/api/admin/matieres")
-            ]);
+        const baseMonday = getMonday(weekAnchor);
 
-            if (etudiantsData && Array.isArray(etudiantsData.content)) {
-                setEtudiants(etudiantsData.content);
-            } else if (Array.isArray(etudiantsData)) {
-                setEtudiants(etudiantsData);
+        return agenda.seances.flatMap((seance) => {
+            const dayIndex = DAY_TO_INDEX[seance.jourSemaine] ?? 1;
+            const eventDate = addDays(baseMonday, dayIndex - 1);
+
+            // Ne pas afficher les seances pendant les jours de vacances.
+            if (isVacationDate(eventDate)) {
+                return [];
             }
 
-            if (matieresData && Array.isArray(matieresData.content)) {
-                setMatieres(matieresData.content);
-            } else if (Array.isArray(matieresData)) {
-                setMatieres(matieresData);
+            const roomLabel = seance.salle?.trim() ? seance.salle.trim() : "Salle N/A";
+            return [{
+                id: String(seance.id),
+                title: `${seance.matiereNom} • ${seance.classeCode} • ${roomLabel}`,
+                start: toEventDateTime(eventDate, seance.heureDebut),
+                end: toEventDateTime(eventDate, seance.heureFin),
+                extendedProps: {
+                    seance,
+                },
+            }];
+        });
+    }, [agenda?.seances, weekAnchor]);
+
+    const vacationBackgroundEvents: VacationBackgroundEvent[] = useMemo(() => {
+        const baseMonday = getMonday(weekAnchor);
+        const events: VacationBackgroundEvent[] = [];
+
+        for (let index = 0; index < 6; index += 1) {
+            const day = addDays(baseMonday, index);
+            if (!isVacationDate(day)) {
+                continue;
             }
-        } catch {
-            toast.error("Erreur lors du chargement des données.");
+
+            const isoDay = formatISODate(day);
+            events.push({
+                id: `vac-${isoDay}`,
+                start: `${isoDay}T08:00:00`,
+                end: `${isoDay}T18:00:00`,
+                display: "background",
+                backgroundColor: "rgba(239, 68, 68, 0.34)",
+                borderColor: "rgba(185, 28, 28, 0.55)",
+            });
         }
-    };
 
-    const fetchAbsences = async () => {
-        try {
-            const data = await api.get("/api/admin/absences");
-            if (data && Array.isArray(data.content)) {
-                setAbsences(data.content);
-            } else if (Array.isArray(data)) {
-                setAbsences(data);
-            } else {
-                setAbsences([]);
-            }
-        } catch {
-            setAbsences([]);
-        }
-    };
+        return events;
+    }, [weekAnchor]);
+
+    const calendarEvents = useMemo(
+        () => [...vacationBackgroundEvents, ...scheduleEvents],
+        [vacationBackgroundEvents, scheduleEvents]
+    );
+
+    const weekLabel = useMemo(() => {
+        const end = addDays(weekAnchor, 5);
+        const startText = weekAnchor.toLocaleDateString("fr-FR", {
+            day: "numeric",
+            month: "long",
+        });
+        const endText = end.toLocaleDateString("fr-FR", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+        });
+        return `${startText} — ${endText}`;
+    }, [weekAnchor]);
 
     useEffect(() => {
-        const init = async () => {
+        const bootstrap = async () => {
             const token = sessionStorage.getItem("token");
             if (!token) {
                 router.push("/login");
                 return;
             }
-            await Promise.all([fetchDropdowns(), fetchAbsences()]);
-            setIsFetchingData(false);
+
+            try {
+                const [filieresData, classesData] = await Promise.all([
+                    api.get("/api/admin/filieres"),
+                    api.get("/api/admin/classes"),
+                ]);
+
+                setFilieres(Array.isArray(filieresData) ? filieresData : []);
+                setClasses(Array.isArray(classesData) ? classesData : []);
+            } catch {
+                toast.error("Impossible de charger les filtres de calendrier.");
+            } finally {
+                setLoading(false);
+            }
         };
-        init();
+
+        bootstrap();
     }, [router]);
 
-    // --- Create ---
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
+    useEffect(() => {
+        if (!selectedNiveau) return;
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSubmitting(true);
+        const loadAgenda = async () => {
+            try {
+                const data = await api.get(
+                    `/api/enseignant/agenda-absences?filiereCode=${encodeURIComponent(selectedFiliere)}&niveauCode=${encodeURIComponent(selectedNiveau)}&referenceDate=${encodeURIComponent(formatISODate(weekAnchor))}`
+                );
+
+                setAgenda(data as AgendaAbsenceResponse);
+            } catch {
+                toast.error("Erreur lors du chargement de l'agenda.");
+                setAgenda({ blocked: false, seances: [] });
+            }
+        };
+
+        loadAgenda();
+    }, [selectedFiliere, selectedNiveau, weekAnchor]);
+
+    const openAbsenceModal = async (seance: Seance, date: Date) => {
+        const dateStr = formatISODate(date);
+
+        setSelectedSeance(seance);
+        setSelectedDate(dateStr);
+        setLoadingModal(true);
+
         try {
-            await api.post("/api/enseignant/absences", {
-                etudiantId: parseInt(formData.etudiantId),
-                matiereId: parseInt(formData.matiereId),
-                dateAbsence: formData.dateAbsence,
-                statut: formData.statut,
-                motif: formData.motif
-            });
-            toast.success("Absence enregistrée avec succès.");
-            setFormData({ ...emptyForm });
-            await fetchAbsences();
-        } catch (error: any) {
-            toast.error(error.message || "Erreur lors de l'enregistrement de l'absence.");
+            const [studentsData, absencesData] = await Promise.all([
+                api.get(`/api/enseignant/classes/${seance.classeId}/etudiants`),
+                api.get(`/api/enseignant/absences/seance/${seance.id}?date=${dateStr}`),
+            ]);
+
+            const students = Array.isArray(studentsData) ? studentsData : [];
+            const absences = Array.isArray(absencesData) ? absencesData : [];
+
+            setEtudiants(students);
+            setExistingAbsences(absences);
+
+            const absentSet = new Set<number>();
+            absences.forEach((a: AbsenceRecord) => absentSet.add(a.etudiantId));
+            setAbsentIds(absentSet);
+        } catch {
+            toast.error("Erreur lors du chargement de la liste d'appel.");
+            setSelectedSeance(null);
         } finally {
-            setIsSubmitting(false);
+            setLoadingModal(false);
         }
     };
 
-    // --- Edit ---
-    const openEditModal = (absence: Absence) => {
-        setEditingAbsence(absence);
-        setEditForm({
-            etudiantId: String(absence.etudiantId || ""),
-            matiereId: String(absence.matiereId || ""),
-            dateAbsence: absence.dateAbsence ? absence.dateAbsence.split('T')[0] : emptyForm.dateAbsence,
-            statut: absence.statut || "NON_JUSTIFIEE",
-            motif: absence.motif || ""
+    const toggleAbsent = (etudiantId: number) => {
+        setAbsentIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(etudiantId)) next.delete(etudiantId);
+            else next.add(etudiantId);
+            return next;
         });
     };
 
-    const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target;
-        setEditForm(prev => ({ ...prev, [name]: value }));
+    const toggleAll = () => {
+        if (absentIds.size === etudiants.length) {
+            setAbsentIds(new Set());
+        } else {
+            setAbsentIds(new Set(etudiants.map((e) => e.id)));
+        }
     };
 
-    const handleEditSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!editingAbsence) return;
+    const handleSubmitAbsences = async () => {
+        if (!selectedSeance) return;
 
-        setIsEditing(true);
+        setSubmitting(true);
         try {
-            await api.put(`/api/admin/absences/${editingAbsence.id}`, {
-                etudiantId: parseInt(editForm.etudiantId),
-                matiereId: parseInt(editForm.matiereId),
-                dateAbsence: editForm.dateAbsence,
-                statut: editForm.statut,
-                motif: editForm.motif
-            });
-            toast.success("Absence modifiée avec succès.");
-            setEditingAbsence(null);
-            await fetchAbsences();
-        } catch (error: any) {
-            toast.error(error.message || "Erreur lors de la modification.");
+            if (existingAbsences.length > 0) {
+                await api.delete(
+                    `/api/enseignant/absences/seance/${selectedSeance.id}?date=${selectedDate}`
+                );
+            }
+
+            if (absentIds.size > 0) {
+                await api.post("/api/enseignant/absences/batch", {
+                    seanceId: selectedSeance.id,
+                    dateAbsence: selectedDate,
+                    etudiantIds: Array.from(absentIds),
+                });
+            }
+
+            toast.success(
+                absentIds.size > 0
+                    ? `${absentIds.size} absence(s) enregistree(s).`
+                    : "Aucune absence: tous presents."
+            );
+            setSelectedSeance(null);
+        } catch {
+            toast.error("Erreur pendant l'enregistrement des absences.");
         } finally {
-            setIsEditing(false);
+            setSubmitting(false);
         }
     };
 
-    // --- Delete ---
-    const handleDelete = async (id: number) => {
-        if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette absence ?")) return;
+    const onCalendarEventClick = (arg: any) => {
+        const seance = arg?.event?.extendedProps?.seance as Seance | undefined;
+        if (!seance) return;
+        const clickedDate = arg.event.start;
+        if (!clickedDate) return;
 
-        try {
-            await api.delete(`/api/admin/absences/${id}`);
-            toast.success("Absence supprimée avec succès.");
-            await fetchAbsences();
-        } catch (error: any) {
-            toast.error(error.message || "Erreur lors de la suppression.");
-        }
+        openAbsenceModal(seance, clickedDate);
     };
 
-    // --- Helpers ---
-    const getStatutBadge = (statut: string) => {
-        switch (statut) {
-            case "JUSTIFIEE": return "bg-green-100 text-green-700";
-            case "NON_JUSTIFIEE": return "bg-red-100 text-red-700";
-            case "EN_ATTENTE": return "bg-orange-100 text-orange-700";
-            default: return "bg-gray-100 text-gray-700";
-        }
-    };
+    const filteredClassesByFiliere = useMemo(() => {
+        return classes.filter((c) => c.filiereCode === selectedFiliere);
+    }, [classes, selectedFiliere]);
 
-    const formatDate = (dateString: string) => {
-        if (!dateString) return "-";
-        const date = new Date(dateString);
-        return date.toLocaleDateString('fr-FR');
-    };
-
-    // Pagination
-    const totalPages = Math.ceil(absences.length / itemsPerPage);
-    const paginatedAbsences = absences.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
-
-    if (isFetchingData) {
+    if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[50vh]">
-                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#ffa000]"></div>
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#ffa000]" />
             </div>
         );
     }
 
-    const inputCls = "w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm";
-
     return (
-        <div className="space-y-8 animate-in fade-in">
-            {/* ─── Create Form Card ─── */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="bg-[#042954] px-8 py-5">
-                    <h2 className="text-xl font-bold text-white">Saisir une Absence</h2>
-                    <p className="text-sm text-white/60 mt-1">Enregistrez l&apos;absence d&apos;un étudiant d&apos;un cours</p>
-                </div>
-
-                <div className="p-8">
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Étudiant */}
-                            <div className="space-y-2">
-                                <label htmlFor="etudiantId" className="text-sm font-bold text-[#333333]">Étudiant <span className="text-red-500">*</span></label>
-                                <select id="etudiantId" name="etudiantId" required value={formData.etudiantId} onChange={handleChange} className={inputCls}>
-                                    <option value="">Sélectionner un étudiant</option>
-                                    {etudiants.map(e => (
-                                        <option key={e.id} value={e.id}>{e.nom} {e.prenom} ({e.matricule})</option>
-                                    ))}
-                                </select>
+        <div className="space-y-6 animate-in fade-in">
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700/50 shadow-sm overflow-hidden">
+                <div className="enseignant-absences-top-band bg-gradient-to-r from-[#042954] to-[#0a3d7a] px-6 md:px-8 py-5">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
+                                <Calendar size={24} className="text-[#ffa000]" />
+                                Prise d'Absence Hebdomadaire
+                            </h2>
+                            <p className="text-sm text-white/60 mt-1">
+                                Regle semestre automatique (15 janvier) appliquee.
+                            </p>
+                        </div>
+                        <div className="text-right text-white/90 text-sm">
+                            <div className="font-semibold">{weekLabel}</div>
+                            <div className="text-white/60">
+                                Semestre actif: {formatSemestreLabel(agenda?.semestreActif)}
                             </div>
-
-                            {/* Matière */}
-                            <div className="space-y-2">
-                                <label htmlFor="matiereId" className="text-sm font-bold text-[#333333]">Matière <span className="text-red-500">*</span></label>
-                                <select id="matiereId" name="matiereId" required value={formData.matiereId} onChange={handleChange} className={inputCls}>
-                                    <option value="">Sélectionner une matière</option>
-                                    {matieres.map(m => (
-                                        <option key={m.id} value={m.id}>{m.nom} {m.code ? `(${m.code})` : ""}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Date absence */}
-                            <div className="space-y-2">
-                                <label htmlFor="dateAbsence" className="text-sm font-bold text-[#333333]">Date de l&apos;absence <span className="text-red-500">*</span></label>
-                                <input id="dateAbsence" name="dateAbsence" type="date" required value={formData.dateAbsence} onChange={handleChange} className={inputCls} />
-                            </div>
-
-                            {/* Statut */}
-                            <div className="space-y-2">
-                                <label htmlFor="statut" className="text-sm font-bold text-[#333333]">Statut <span className="text-red-500">*</span></label>
-                                <select id="statut" name="statut" required value={formData.statut} onChange={handleChange} className={inputCls}>
-                                    <option value="NON_JUSTIFIEE">Non Justifiée</option>
-                                    <option value="EN_ATTENTE">En Attente</option>
-                                </select>
+                            <div className="mt-2 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setWeekAnchor((prev) => addDays(prev, -7))}
+                                    className="px-2.5 py-1 rounded bg-white/15 hover:bg-white/25 text-xs font-semibold"
+                                >
+                                    Semaine -1
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setWeekAnchor(getMonday(new Date()))}
+                                    className="px-2.5 py-1 rounded bg-[#ffa000] hover:bg-[#ff8f00] text-xs font-semibold text-white"
+                                >
+                                    Aujourd'hui
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setWeekAnchor((prev) => addDays(prev, 7))}
+                                    className="px-2.5 py-1 rounded bg-white/15 hover:bg-white/25 text-xs font-semibold"
+                                >
+                                    Semaine +1
+                                </button>
                             </div>
                         </div>
-
-                        {/* Motif */}
-                        <div className="space-y-2">
-                            <label htmlFor="motif" className="text-sm font-bold text-[#333333]">Motif (optionnel)</label>
-                            <textarea id="motif" name="motif" rows={2} value={formData.motif} onChange={handleChange} className={`${inputCls} resize-none`} placeholder="Motif de l'absence..."></textarea>
-                        </div>
-
-                        {/* Submit */}
-                        <div className="pt-6 border-t border-gray-100 flex items-center justify-end">
-                            <button
-                                type="submit"
-                                disabled={isSubmitting}
-                                className={`px-8 py-3 rounded-lg font-bold text-white transition-all shadow-md flex items-center gap-2 text-sm ${isSubmitting ? 'bg-[#ffc166] cursor-not-allowed' : 'bg-[#ffa000] hover:bg-[#ff8f00]'}`}
-                            >
-                                <Save size={18} />
-                                {isSubmitting ? "Enregistrement..." : "Enregistrer l'absence"}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            {/* ─── Absences Table ─── */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-100">
-                    <h2 className="text-xl font-bold text-[#042954]">Absences Enregistrées</h2>
-                </div>
-
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse hidden md:table">
-                        <thead>
-                            <tr className="bg-gray-50 text-gray-500 border-b border-gray-200 text-sm">
-                                <th className="p-4 font-semibold text-center w-16">#</th>
-                                <th className="p-4 font-semibold">Étudiant</th>
-                                <th className="p-4 font-semibold">Matière</th>
-                                <th className="p-4 font-semibold">Date</th>
-                                <th className="p-4 font-semibold text-center">Statut</th>
-                                <th className="p-4 font-semibold">Motif</th>
-                                <th className="p-4 font-semibold text-center">Alerte</th>
-                                <th className="p-4 font-semibold text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {absences.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8} className="p-8 text-center text-gray-500">Aucune absence enregistrée.</td>
-                                </tr>
-                            ) : (
-                                paginatedAbsences.map((absence, index) => (
-                                    <tr key={absence.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
-                                        <td className="p-4 text-center text-sm text-gray-400 font-medium">
-                                            {(currentPage - 1) * itemsPerPage + index + 1}
-                                        </td>
-                                        <td className="p-4">
-                                            <div className="font-bold text-[#333333] whitespace-nowrap">{absence.etudiantNom} {absence.etudiantPrenom}</div>
-                                        </td>
-                                        <td className="p-4 text-[#042954] font-medium text-sm">{absence.matiere || "-"}</td>
-                                        <td className="p-4 text-gray-600 truncate">{formatDate(absence.dateAbsence)}</td>
-                                        <td className="p-4 text-center">
-                                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap ${getStatutBadge(absence.statut)}`}>
-                                                {absence.statut.replace('_', ' ')}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-gray-500 text-sm truncate max-w-[200px]" title={absence.motif || ""}>{absence.motif || "-"}</td>
-                                        <td className="p-4 text-center">
-                                            {absence.alerte && (
-                                                <div className="flex justify-center flex-col items-center group relative cursor-help">
-                                                    <AlertTriangle size={20} className="text-red-500" />
-                                                    <div className="opacity-0 w-48 bg-black text-white text-xs rounded py-1 px-2 absolute z-10 bottom-full mb-2 pointer-events-none group-hover:opacity-100 transition-opacity">
-                                                        Alerte dépassement seuil
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="p-4 flex items-center justify-end gap-2">
-                                            <button
-                                                onClick={() => openEditModal(absence)}
-                                                className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors cursor-pointer"
-                                                title="Modifier"
-                                            >
-                                                <Edit2 size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(absence.id)}
-                                                className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors cursor-pointer"
-                                                title="Supprimer"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-
-                    {/* Mobile version (Cards) */}
-                    <div className="grid grid-cols-1 gap-4 p-4 md:hidden bg-gray-50/30">
-                        {isFetchingData ? (
-                            <div className="p-8 text-center text-gray-500 flex justify-center items-center gap-3">
-                                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#ffa000]"></div>
-                                Chargement en cours...
-                            </div>
-                        ) : paginatedAbsences.length === 0 ? (
-                            <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100">Aucune absence trouvée.</div>
-                        ) : (
-                            paginatedAbsences.map((absence) => (
-                                <div key={absence.id} className={`bg-white p-4 rounded-xl shadow-sm relative flex flex-col gap-3 border transition-colors ${absence.alerte ? 'border-red-200' : 'border-gray-200'}`}>
-                                    {absence.alerte && (
-                                        <div className="absolute top-4 right-4 animate-pulse">
-                                            <AlertTriangle size={20} className="text-red-500" />
-                                        </div>
-                                    )}
-                                    <div className="flex flex-col pr-8">
-                                        <div className="font-bold text-[#333333] text-lg mb-1">{absence.etudiantNom} {absence.etudiantPrenom}</div>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${getStatutBadge(absence.statut)}`}>
-                                                {absence.statut.replace('_', ' ')}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm">
-                                        <div className="flex justify-between items-center py-1 border-b border-gray-200">
-                                            <span className="text-gray-500">Matière</span>
-                                            <span className="font-bold text-[#042954] text-right">{absence.matiere || "-"}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-1 border-b border-gray-200">
-                                            <span className="text-gray-500">Date</span>
-                                            <span className="font-medium text-gray-700 text-right">{formatDate(absence.dateAbsence)}</span>
-                                        </div>
-                                        <div>
-                                            <span className="block text-gray-500 mb-1">Motif</span>
-                                            <div className="bg-gray-100 text-gray-600 p-2 rounded text-xs">
-                                                {absence.motif || "Aucun motif"}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-                                        <button onClick={() => openEditModal(absence)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded" title="Modifier"><Edit2 size={16} /></button>
-                                        <button onClick={() => handleDelete(absence.id)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded" title="Supprimer"><Trash2 size={16} /></button>
-                                    </div>
-                                </div>
-                            ))
-                        )}
                     </div>
                 </div>
 
-                {/* Pagination */}
-                {absences.length > 0 && (
-                    <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-3">
-                            <span className="text-gray-500 font-medium whitespace-nowrap">
-                                Affichage de {(currentPage - 1) * itemsPerPage + 1} à {Math.min(currentPage * itemsPerPage, absences.length)} sur {absences.length}
-                            </span>
-                            <div className="flex items-center gap-2 border-l pl-3 hidden sm:flex">
-                                <span className="text-gray-500">Afficher:</span>
-                                <select
-                                    value={itemsPerPage}
-                                    onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                                    className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#ffa000]"
-                                >
-                                    {[5, 10, 25, 50].map(n => (
-                                        <option key={n} value={n}>{n}</option>
-                                    ))}
-                                </select>
+                <div className="p-6 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50/60">
+                    <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider mb-4">
+                        <Filter size={14} />
+                        Filtres d'affichage
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 mb-2">Filiere</label>
+                            <select
+                                className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#ffa000]"
+                                value={selectedFiliere}
+                                onChange={(e) => {
+                                    const next = e.target.value;
+                                    setSelectedFiliere(next);
+                                    setSelectedNiveau("LCS1");
+                                }}
+                            >
+                                {filieres.length === 0 && (
+                                    <option value="LCS">LCS</option>
+                                )}
+                                {filieres.map((f) => (
+                                    <option key={f.id} value={f.code}>
+                                        {f.code} - {f.nom}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 mb-2">Niveau</label>
+                            <select
+                                className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#ffa000]"
+                                value={selectedNiveau}
+                                onChange={(e) => setSelectedNiveau(e.target.value)}
+                            >
+                                {availableNiveaux.map((n) => (
+                                    <option key={n} value={n}>
+                                        {n}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 mb-2">Classes concernees</label>
+                            <div className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-2.5 text-sm text-gray-600 dark:text-slate-300">
+                                {filteredClassesByFiliere
+                                    .filter((c) => c.niveauCode === selectedNiveau)
+                                    .map((c) => c.code)
+                                    .slice(0, 4)
+                                    .join(", ") || "-"}
                             </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                            <button disabled={currentPage === 1} onClick={() => setCurrentPage(1)} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Première page">
-                                <ChevronsLeft size={18} />
-                            </button>
-                            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Page précédente">
-                                <ChevronLeft size={18} />
-                            </button>
+                    </div>
+                </div>
 
-                            {Array.from({ length: totalPages }).map((_, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => setCurrentPage(i + 1)}
-                                    className={`w-8 h-8 rounded border transition-colors font-medium flex items-center justify-center ${currentPage === i + 1
-                                        ? 'bg-[#042954] text-white border-[#042954]'
-                                        : 'border-gray-300 text-gray-500 hover:bg-gray-50'
-                                        }`}
-                                >
-                                    {i + 1}
-                                </button>
-                            ))}
-
-                            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Page suivante">
-                                <ChevronRight size={18} />
-                            </button>
-                            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(totalPages)} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Dernière page">
-                                <ChevronsRight size={18} />
-                            </button>
+                {agenda?.blocked ? (
+                    <div className="p-8 md:p-10">
+                        <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 flex items-start gap-3">
+                            <AlertTriangle className="text-red-600 mt-0.5" size={20} />
+                            <div>
+                                <h3 className="font-bold text-red-700">Annee universitaire terminee pour ce niveau</h3>
+                                <p className="text-sm text-red-700/90 mt-1">
+                                    {agenda.message || "Le calendrier est desactive pour ce niveau apres le 15 janvier."}
+                                </p>
+                            </div>
                         </div>
+                    </div>
+                ) : (
+                    <div className="p-4 md:p-6">
+                        {agenda?.message && (
+                            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                                {agenda.message}
+                            </div>
+                        )}
+
+                        {vacationBackgroundEvents.length > 0 && (
+                            <div className="mb-3 text-xs font-semibold text-red-700 dark:text-red-300">
+                                Les zones rouges indiquent les periodes de vacances (seances masquees).
+                            </div>
+                        )}
+
+                        <div className="rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
+                            <FullCalendar
+                                key={`${selectedFiliere}-${selectedNiveau}-${formatISODate(weekAnchor)}`}
+                                plugins={[timeGridPlugin, interactionPlugin]}
+                                locale={frLocale}
+                                initialView="timeGridWeek"
+                                initialDate={formatISODate(weekAnchor)}
+                                weekends
+                                hiddenDays={[0]}
+                                allDaySlot={false}
+                                headerToolbar={false}
+                                events={calendarEvents}
+                                eventClick={onCalendarEventClick}
+                                selectable={false}
+                                nowIndicator
+                                dayHeaderFormat={{ weekday: "long", day: "2-digit", month: "2-digit" }}
+                                slotMinTime="08:00:00"
+                                slotMaxTime="18:00:00"
+                                slotDuration="00:30:00"
+                                height="auto"
+                            />
+                        </div>
+
+                        {scheduleEvents.length === 0 && (
+                            <div className="text-center text-sm text-gray-500 dark:text-slate-400 py-6">
+                                {agenda?.semestreActif === "STAGE_PFE"
+                                    ? "Periode Stage PFE: pas de seances d'absence a planifier."
+                                    : "Aucune seance trouvee pour ces filtres et ce semestre."}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
 
-            {/* ─── Edit Modal ─── */}
-            {editingAbsence && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setEditingAbsence(null)} />
+            {selectedSeance && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !submitting && setSelectedSeance(null)} />
 
-                    <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden animate-in fade-in zoom-in">
-                        <div className="bg-[#042954] px-8 py-5 flex items-center justify-between">
-                            <div>
-                                <h3 className="text-lg font-bold text-white">Modifier l&apos;Absence</h3>
-                                <p className="text-sm text-white/60 mt-0.5">{editingAbsence.etudiantNom} {editingAbsence.etudiantPrenom} — {editingAbsence.matiere}</p>
+                    <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden max-h-[92vh] flex flex-col animate-in fade-in zoom-in">
+                        <div className="enseignant-absences-top-band bg-gradient-to-r from-[#042954] to-[#0a3d7a] px-6 py-5">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <h3 className="text-lg font-bold text-white">Liste d'appel</h3>
+                                    <p className="text-sm text-white/80 mt-1">
+                                        {selectedSeance.matiereNom} • {selectedSeance.classeCode} • {selectedDate}
+                                    </p>
+                                    <p className="text-xs text-white/70 mt-1 flex items-center gap-1">
+                                        <Clock size={12} /> {toTimeHHMM(selectedSeance.heureDebut)} - {toTimeHHMM(selectedSeance.heureFin)}
+                                    </p>
+                                    <p className="text-xs text-white/70 mt-1">
+                                        Salle: {selectedSeance.salle?.trim() ? selectedSeance.salle : "N/A"}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => !submitting && setSelectedSeance(null)}
+                                    className="text-white/70 hover:text-white"
+                                >
+                                    <X size={22} />
+                                </button>
                             </div>
-                            <button onClick={() => setEditingAbsence(null)} className="text-white/60 hover:text-white transition-colors p-1">
-                                <X size={22} />
+                        </div>
+
+                        <div className="px-6 py-3 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-4">
+                                <span className="flex items-center gap-1.5 text-gray-700">
+                                    <Users size={14} /> {etudiants.length} etudiants
+                                </span>
+                                <span className="text-red-600 font-semibold">{absentIds.size} absents</span>
+                                <span className="text-green-600 font-semibold">{etudiants.length - absentIds.size} presents</span>
+                            </div>
+                            <button
+                                onClick={toggleAll}
+                                className="text-xs font-bold text-[#042954] dark:text-white hover:text-[#ffa000]"
+                            >
+                                {absentIds.size === etudiants.length ? "Tout decocher" : "Tout cocher"}
                             </button>
                         </div>
 
-                        <form onSubmit={handleEditSubmit} className="p-8 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-[#333333]">Étudiant <span className="text-red-500">*</span></label>
-                                    <select name="etudiantId" required value={editForm.etudiantId} onChange={handleEditChange} className={inputCls}>
-                                        <option value="">Sélectionner un étudiant</option>
-                                        {etudiants.map(e => (
-                                            <option key={e.id} value={e.id}>{e.nom} {e.prenom} ({e.matricule})</option>
-                                        ))}
-                                    </select>
+                        <div className="flex-1 overflow-y-auto px-6 py-3">
+                            {loadingModal ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#ffa000]" />
                                 </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-[#333333]">Matière <span className="text-red-500">*</span></label>
-                                    <select name="matiereId" required value={editForm.matiereId} onChange={handleEditChange} className={inputCls}>
-                                        <option value="">Sélectionner une matière</option>
-                                        {matieres.map(m => (
-                                            <option key={m.id} value={m.id}>{m.nom} {m.code ? `(${m.code})` : ""}</option>
-                                        ))}
-                                    </select>
+                            ) : etudiants.length === 0 ? (
+                                <div className="py-12 text-center text-gray-500 dark:text-slate-400">Aucun etudiant trouve pour cette classe.</div>
+                            ) : (
+                                <div className="space-y-1">
+                                    {etudiants.map((etudiant, idx) => {
+                                        const isAbsent = absentIds.has(etudiant.id);
+                                        return (
+                                            <button
+                                                key={etudiant.id}
+                                                onClick={() => toggleAbsent(etudiant.id)}
+                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
+                                                    isAbsent
+                                                        ? "border-red-200 bg-red-50"
+                                                        : "border-transparent bg-white dark:bg-slate-800 hover:bg-gray-50 dark:bg-slate-800/50 hover:border-gray-200 dark:border-slate-700"
+                                                }`}
+                                            >
+                                                <div
+                                                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center ${
+                                                        isAbsent ? "bg-red-500 border-red-500" : "border-gray-300 dark:border-slate-600"
+                                                    }`}
+                                                >
+                                                    {isAbsent && <Check size={12} className="text-white" strokeWidth={3} />}
+                                                </div>
+                                                <span className="text-xs text-gray-400 dark:text-slate-500 font-bold w-6 text-center">{idx + 1}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className={`text-sm font-bold truncate ${isAbsent ? "text-red-700 dark:text-red-400" : "text-[#333] dark:text-green-500"}`}>
+                                                        {etudiant.nom} {etudiant.prenom}
+                                                    </div>
+                                                    <div className="text-[11px] text-gray-400 dark:text-slate-500 font-mono">{etudiant.matricule}</div>
+                                                </div>
+                                                <span
+                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                                        isAbsent ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-500"
+                                                    }`}
+                                                >
+                                                    {isAbsent ? "Absent" : "Present"}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
+                            )}
+                        </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-[#333333]">Date de l&apos;absence <span className="text-red-500">*</span></label>
-                                    <input name="dateAbsence" type="date" required value={editForm.dateAbsence} onChange={handleEditChange} className={inputCls} />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold text-[#333333]">Statut <span className="text-red-500">*</span></label>
-                                    <select name="statut" required value={editForm.statut} onChange={handleEditChange} className={inputCls}>
-                                        <option value="NON_JUSTIFIEE">Non Justifiée</option>
-                                        <option value="JUSTIFIEE">Justifiée</option>
-                                        <option value="EN_ATTENTE">En Attente</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-[#333333]">Motif</label>
-                                <textarea name="motif" rows={3} value={editForm.motif} onChange={handleEditChange} className={`${inputCls} resize-none`} placeholder="Motif de l'absence..."></textarea>
-                            </div>
-
-                            <div className="pt-6 border-t border-gray-100 flex items-center justify-end gap-4">
-                                <button type="button" onClick={() => setEditingAbsence(null)} className="px-6 py-3 font-semibold text-gray-500 hover:bg-gray-50 rounded-lg transition-colors text-sm">
-                                    Annuler
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isEditing}
-                                    className={`px-8 py-3 rounded-lg font-bold text-white transition-all shadow-md flex items-center gap-2 text-sm ${isEditing ? 'bg-[#ffc166] cursor-not-allowed' : 'bg-[#03a9f4] hover:bg-[#0288d1]'}`}
-                                >
-                                    <Save size={18} />
-                                    {isEditing ? "Enregistrement..." : "Mettre à jour"}
-                                </button>
-                            </div>
-                        </form>
+                        <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-between">
+                            <button
+                                type="button"
+                                onClick={() => !submitting && setSelectedSeance(null)}
+                                className="px-5 py-2.5 font-semibold text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:bg-slate-800/50 rounded-lg text-sm"
+                                disabled={submitting}
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={handleSubmitAbsences}
+                                disabled={submitting || loadingModal}
+                                className={`px-6 py-2.5 rounded-lg font-bold text-white transition-all shadow-md flex items-center gap-2 text-sm ${
+                                    submitting ? "bg-[#ffc166] cursor-not-allowed" : "bg-[#ffa000] hover:bg-[#ff8f00]"
+                                }`}
+                            >
+                                <Save size={16} />
+                                {submitting
+                                    ? "Enregistrement..."
+                                    : `Enregistrer (${absentIds.size} absent${absentIds.size > 1 ? "s" : ""})`}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -27,7 +27,7 @@ const TYPES_NOTE = [
     { value: "PROJET", label: "Projet" },
 ];
 
-const SEMESTRES = ["S1", "S2", "S3", "S4", "S5", "S6"];
+const SEMESTRES = ["S1", "S2", "S3", "S4", "S5"];
 
 export default function CreateNotePage() {
     const router = useRouter();
@@ -115,7 +115,7 @@ export default function CreateNotePage() {
         );
     }
 
-    const inputCls = "w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm";
+    const inputCls = "w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm";
 
     return (
         <div className="max-w-4xl mx-auto">
@@ -123,23 +123,23 @@ export default function CreateNotePage() {
             <div className="flex items-center gap-4 mb-8">
                 <Link
                     href="/enseignant/notes"
-                    className="p-2 bg-white rounded-full border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm text-gray-500"
+                    className="p-2 bg-white dark:bg-slate-800 rounded-full border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:bg-slate-800/50 transition-colors shadow-sm text-gray-500 dark:text-slate-400"
                 >
                     <ArrowLeft size={20} />
                 </Link>
                 <div>
-                    <h1 className="text-2xl font-bold text-[#042954] tracking-tight">Saisir une Note</h1>
-                    <p className="text-sm text-gray-500">Enregistrez les résultats d&apos;un étudiant</p>
+                    <h1 className="text-[#042954] dark:text-whitexl font-bold text-[#042954] dark:text-white tracking-tight">Saisir une Note</h1>
+                    <p className="text-sm text-gray-500 dark:text-slate-400">Enregistrez les résultats d&apos;un étudiant</p>
                 </div>
             </div>
 
             {/* Form */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8">
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm p-8">
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Étudiant */}
                         <div className="space-y-2">
-                            <label htmlFor="etudiantId" className="text-sm font-bold text-[#333333]">Étudiant <span className="text-red-500">*</span></label>
+                            <label htmlFor="etudiantId" className="text-sm font-bold text-[#333333] dark:text-slate-100">Étudiant <span className="text-red-500">*</span></label>
                             <select id="etudiantId" name="etudiantId" required value={formData.etudiantId} onChange={handleChange} className={inputCls}>
                                 <option value="">Sélectionner un étudiant</option>
                                 {etudiants.map(e => (
@@ -150,7 +150,7 @@ export default function CreateNotePage() {
 
                         {/* Matière */}
                         <div className="space-y-2">
-                            <label htmlFor="matiereId" className="text-sm font-bold text-[#333333]">Matière <span className="text-red-500">*</span></label>
+                            <label htmlFor="matiereId" className="text-sm font-bold text-[#333333] dark:text-slate-100">Matière <span className="text-red-500">*</span></label>
                             <select id="matiereId" name="matiereId" required value={formData.matiereId} onChange={handleChange} className={inputCls}>
                                 <option value="">Sélectionner une matière</option>
                                 {matieres.map(m => (
@@ -161,13 +161,13 @@ export default function CreateNotePage() {
 
                         {/* Note */}
                         <div className="space-y-2">
-                            <label htmlFor="note" className="text-sm font-bold text-[#333333]">Note (0 - 20) <span className="text-red-500">*</span></label>
+                            <label htmlFor="note" className="text-sm font-bold text-[#333333] dark:text-slate-100">Note (0 - 20) <span className="text-red-500">*</span></label>
                             <input id="note" name="note" type="number" step="0.5" min="0" max="20" required value={formData.note} onChange={handleChange} className={inputCls} placeholder="15.5" />
                         </div>
 
                         {/* Type */}
                         <div className="space-y-2">
-                            <label htmlFor="type" className="text-sm font-bold text-[#333333]">Type de Note <span className="text-red-500">*</span></label>
+                            <label htmlFor="type" className="text-sm font-bold text-[#333333] dark:text-slate-100">Type de Note <span className="text-red-500">*</span></label>
                             <select id="type" name="type" required value={formData.type} onChange={handleChange} className={inputCls}>
                                 {TYPES_NOTE.map(t => (
                                     <option key={t.value} value={t.value}>{t.label}</option>
@@ -177,7 +177,7 @@ export default function CreateNotePage() {
 
                         {/* Semestre */}
                         <div className="space-y-2">
-                            <label htmlFor="semestre" className="text-sm font-bold text-[#333333]">Semestre <span className="text-red-500">*</span></label>
+                            <label htmlFor="semestre" className="text-sm font-bold text-[#333333] dark:text-slate-100">Semestre <span className="text-red-500">*</span></label>
                             <select id="semestre" name="semestre" required value={formData.semestre} onChange={handleChange} className={inputCls}>
                                 {SEMESTRES.map(s => (
                                     <option key={s} value={s}>Semestre {s}</option>
@@ -188,15 +188,15 @@ export default function CreateNotePage() {
 
                     {/* Commentaire */}
                     <div className="space-y-2">
-                        <label htmlFor="commentaire" className="text-sm font-bold text-[#333333]">Commentaire</label>
+                        <label htmlFor="commentaire" className="text-sm font-bold text-[#333333] dark:text-slate-100">Commentaire</label>
                         <textarea id="commentaire" name="commentaire" rows={3} value={formData.commentaire} onChange={handleChange} className={`${inputCls} resize-none`} placeholder="Commentaire optionnel sur la note..."></textarea>
                     </div>
 
                     {/* Actions */}
-                    <div className="pt-6 border-t border-gray-100 flex items-center justify-end gap-4">
+                    <div className="pt-6 border-t border-gray-100 dark:border-slate-700 flex items-center justify-end gap-4">
                         <Link
                             href="/enseignant/notes"
-                            className="px-6 py-3 font-semibold text-gray-500 hover:bg-gray-50 rounded-lg transition-colors text-sm"
+                            className="px-6 py-3 font-semibold text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:bg-slate-800/50 rounded-lg transition-colors text-sm"
                         >
                             Annuler
                         </Link>

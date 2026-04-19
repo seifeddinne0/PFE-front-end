@@ -13,7 +13,7 @@ interface Absence {
     etudiantPrenom: string;
     etudiantMatricule: string;
     matiereId: number;
-    matiere: string;
+    matiereNom: string;
     dateAbsence: string;
     statut: string;
     motif: string;
@@ -103,10 +103,11 @@ export default function AdminAbsencesPage() {
 
     const getStatutBadge = (statut: string) => {
         switch (statut) {
-            case "JUSTIFIEE": return "bg-green-100 text-green-700";
-            case "NON_JUSTIFIEE": return "bg-red-100 text-red-700";
-            case "EN_ATTENTE": return "bg-orange-100 text-orange-700";
-            default: return "bg-gray-100 text-gray-700";
+            case "JUSTIFIEE": return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+            case "NON_JUSTIFIEE": return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+            case "EN_ATTENTE": return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
+            case "ACTIF": return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+            default: return "bg-gray-100 text-gray-700 dark:bg-[#1a1a1a] dark:text-zinc-400";
         }
     };
 
@@ -127,23 +128,23 @@ export default function AdminAbsencesPage() {
         currentPage * itemsPerPage
     );
 
-    const inputCls = "w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm";
+    const inputCls = "w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm";
 
     return (
         <div className="space-y-8 animate-in fade-in">
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="bg-white dark:bg-[#111111] rounded-xl border border-gray-100 dark:border-zinc-800/50 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-100 dark:border-zinc-800/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h2 className="text-xl font-bold text-[#042954]">Liste des Absences</h2>
-                        <p className="text-sm text-gray-500 mt-1">Gestion et suivi des absences des étudiants</p>
+                        <h2 className="text-xl font-bold text-[#042954] dark:text-white">Liste des Absences</h2>
+                        <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Gestion et suivi des absences des étudiants</p>
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-500">Filtrer par statut:</span>
+                        <span className="text-sm font-medium text-gray-500 dark:text-slate-400">Filtrer par statut:</span>
                         <select
                             value={filterStatut}
                             onChange={(e) => { setFilterStatut(e.target.value); setCurrentPage(1); }}
-                            className="bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-[#ffa000] focus:border-[#ffa000] block p-2 outline-none"
+                            className="bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 text-gray-700 text-sm rounded-lg focus:ring-[#ffa000] focus:border-[#ffa000] block p-2 outline-none"
                         >
                             <option value="TOUS">Tous les statuts</option>
                             <option value="JUSTIFIEE">Justifiée</option>
@@ -156,9 +157,8 @@ export default function AdminAbsencesPage() {
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse hidden md:table">
                         <thead>
-                            <tr className="bg-gray-50 text-gray-500 border-b border-gray-200 text-sm">
+                            <tr className="bg-gray-50 dark:bg-[#1a1a1a] text-gray-500 dark:text-zinc-400 border-b border-gray-200 dark:border-zinc-800/50 text-sm">
                                 <th className="p-4 font-semibold">Étudiant</th>
-                                <th className="p-4 font-semibold">Matricule</th>
                                 <th className="p-4 font-semibold">Matière</th>
                                 <th className="p-4 font-semibold">Date</th>
                                 <th className="p-4 font-semibold text-center">Statut</th>
@@ -170,7 +170,7 @@ export default function AdminAbsencesPage() {
                         <tbody>
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={8} className="p-8 text-center text-gray-500">
+                                    <td colSpan={7} className="p-8 text-center text-gray-500 dark:text-slate-400">
                                         <div className="flex items-center justify-center gap-3">
                                             <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#ffa000]"></div>
                                             Chargement des absences...
@@ -179,25 +179,25 @@ export default function AdminAbsencesPage() {
                                 </tr>
                             ) : filteredAbsences.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="p-8 text-center text-gray-500">
+                                    <td colSpan={7} className="p-8 text-center text-gray-500 dark:text-slate-400">
                                         Aucune absence trouvée.
                                     </td>
                                 </tr>
                             ) : (
                                 paginatedAbsences.map((absence) => (
-                                    <tr key={absence.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                                    <tr key={absence.id} className="border-b border-gray-100 dark:border-zinc-800/50 hover:bg-gray-50/50 dark:hover:bg-[#151515] transition-colors dark:text-zinc-300">
                                         <td className="p-4">
-                                            <div className="font-bold text-[#333333] whitespace-nowrap">{absence.etudiantNom} {absence.etudiantPrenom}</div>
+                                            <div className="font-bold text-[#333333] dark:text-zinc-100 text-lg leading-tight">{absence.etudiantNom} {absence.etudiantPrenom}</div>
+                                            <div className="text-xs text-amber-600 dark:text-amber-400 font-bold mt-0.5">{absence.etudiantMatricule}</div>
                                         </td>
-                                        <td className="p-4 text-gray-500 text-sm">{absence.etudiantMatricule}</td>
-                                        <td className="p-4 text-[#042954] font-medium">{absence.matiere}</td>
-                                        <td className="p-4 text-gray-600 truncate">{formatDate(absence.dateAbsence)}</td>
+                                        <td className="p-4 text-[#042954] dark:text-white font-medium">{absence.matiereNom || "-"}</td>
+                                        <td className="p-4 text-gray-600 dark:text-slate-300 truncate">{formatDate(absence.dateAbsence)}</td>
                                         <td className="p-4 text-center">
                                             <span className={`px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap ${getStatutBadge(absence.statut)}`}>
                                                 {absence.statut.replace('_', ' ')}
                                             </span>
                                         </td>
-                                        <td className="p-4 text-sm text-gray-600 max-w-[200px]">
+                                        <td className="p-4 text-sm text-gray-600 dark:text-slate-300 max-w-[200px]">
                                             {absence.statut === "JUSTIFIEE" && absence.justification ? (
                                                 <div className="truncate" title={absence.justification}>
                                                     <span className="font-medium text-green-700">Justification: </span>
@@ -218,7 +218,7 @@ export default function AdminAbsencesPage() {
                                             {absence.statut !== "JUSTIFIEE" && (
                                                 <button
                                                     onClick={() => { setJustifyingAbsence(absence); setJustification(""); }}
-                                                    className="p-2 text-green-600 bg-green-50 hover:bg-green-100 rounded transition-colors cursor-pointer"
+                                                    className="p-2 text-green-600 bg-green-50 hover:bg-green-100 dark:text-green-400 dark:bg-green-900/20 dark:hover:bg-green-900/40 rounded transition-colors cursor-pointer"
                                                     title="Justifier l'absence"
                                                 >
                                                     <CheckCircle size={16} />
@@ -226,7 +226,7 @@ export default function AdminAbsencesPage() {
                                             )}
                                             <button
                                                 onClick={() => handleDelete(absence.id)}
-                                                className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors cursor-pointer"
+                                                className="p-2 text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded transition-colors cursor-pointer"
                                                 title="Supprimer"
                                             >
                                                 <Trash2 size={16} />
@@ -239,60 +239,60 @@ export default function AdminAbsencesPage() {
                     </table>
 
                     {/* Mobile version (Cards) */}
-                    <div className="grid grid-cols-1 gap-4 p-4 md:hidden bg-gray-50/30">
+                    <div className="grid grid-cols-1 gap-4 p-4 md:hidden bg-gray-50 dark:bg-slate-800/50/30">
                         {isLoading ? (
-                            <div className="p-8 text-center text-gray-500 flex justify-center items-center gap-3">
+                            <div className="p-8 text-center text-gray-500 dark:text-slate-400 flex justify-center items-center gap-3">
                                 <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#ffa000]"></div>
                                 Chargement des absences...
                             </div>
                         ) : paginatedAbsences.length === 0 ? (
-                            <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100">Aucune absence trouvée.</div>
+                            <div className="p-8 text-center text-gray-500 dark:text-slate-400 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700">Aucune absence trouvée.</div>
                         ) : (
                             paginatedAbsences.map((absence) => (
-                                <div key={absence.id} className={`bg-white p-4 rounded-xl shadow-sm relative flex flex-col gap-3 border transition-colors ${absence.alerte ? 'border-red-200' : 'border-gray-200'}`}>
+                                <div key={absence.id} className={`bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm relative flex flex-col gap-3 border transition-colors ${absence.alerte ? 'border-red-200' : 'border-gray-200 dark:border-slate-700'}`}>
                                     {absence.alerte && (
                                         <div className="absolute top-4 right-4 animate-pulse">
                                             <AlertTriangle size={20} className="text-red-500" />
                                         </div>
                                     )}
                                     <div className="flex flex-col pr-8">
-                                        <div className="font-bold text-[#333333] text-lg mb-1">{absence.etudiantNom} {absence.etudiantPrenom}</div>
+                                        <div className="font-bold text-[#333333] dark:text-slate-100 text-lg mb-1">{absence.etudiantNom} {absence.etudiantPrenom}</div>
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${getStatutBadge(absence.statut)}`}>
                                                 {absence.statut.replace('_', ' ')}
                                             </span>
-                                            <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{absence.etudiantMatricule}</span>
+                                            <span className="text-xs font-bold text-amber-700 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-300 px-2 py-0.5 rounded">{absence.etudiantMatricule}</span>
                                         </div>
                                     </div>
                                     
-                                    <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm">
-                                        <div className="flex justify-between items-center py-1 border-b border-gray-200">
-                                            <span className="text-gray-500">Matière</span>
-                                            <span className="font-bold text-[#042954] text-right">{absence.matiere}</span>
+                                    <div className="space-y-2 bg-gray-50 dark:bg-slate-800/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700 text-sm">
+                                        <div className="flex justify-between items-center py-1 border-b border-gray-200 dark:border-slate-700">
+                                            <span className="text-gray-500 dark:text-slate-400">Matière</span>
+                                            <span className="font-bold text-[#042954] dark:text-white text-right">{absence.matiereNom || "-"}</span>
                                         </div>
-                                        <div className="flex justify-between items-center py-1 border-b border-gray-200">
-                                            <span className="text-gray-500">Date</span>
+                                        <div className="flex justify-between items-center py-1 border-b border-gray-200 dark:border-slate-700">
+                                            <span className="text-gray-500 dark:text-slate-400">Date</span>
                                             <span className="font-medium text-gray-700 text-right">{formatDate(absence.dateAbsence)}</span>
                                         </div>
                                         <div>
-                                            <span className="block text-gray-500 mb-1">Motif / Justification</span>
+                                            <span className="block text-gray-500 dark:text-slate-400 mb-1">Motif / Justification</span>
                                             {absence.statut === "JUSTIFIEE" && absence.justification ? (
                                                 <div className="bg-green-50 text-green-800 p-2 rounded text-xs border border-green-100">
                                                     {absence.justification}
                                                 </div>
                                             ) : (
-                                                <div className="bg-gray-100 text-gray-600 p-2 rounded text-xs">
+                                                <div className="bg-gray-100 text-gray-600 dark:text-slate-300 p-2 rounded text-xs">
                                                     {absence.motif || "Aucun motif"}
                                                 </div>
                                             )}
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-slate-700">
                                         {absence.statut !== "JUSTIFIEE" && (
-                                            <button onClick={() => { setJustifyingAbsence(absence); setJustification(""); }} className="p-2 px-3 text-sm flex items-center gap-1 text-green-600 bg-green-50 hover:bg-green-100 rounded" title="Justifier l'absence"><CheckCircle size={16} /> Justifier</button>
+                                            <button onClick={() => { setJustifyingAbsence(absence); setJustification(""); }} className="p-2 px-3 text-sm flex items-center gap-1 text-green-600 bg-green-50 hover:bg-green-100 dark:text-green-400 dark:bg-green-900/20 dark:hover:bg-green-900/40 rounded" title="Justifier l'absence"><CheckCircle size={16} /> Justifier</button>
                                         )}
-                                        <button onClick={() => handleDelete(absence.id)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded" title="Supprimer"><Trash2 size={16} /></button>
+                                        <button onClick={() => handleDelete(absence.id)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded" title="Supprimer"><Trash2 size={16} /></button>
                                     </div>
                                 </div>
                             ))
@@ -302,17 +302,17 @@ export default function AdminAbsencesPage() {
 
                 {/* Pagination */}
                 {!isLoading && filteredAbsences.length > 0 && (
-                    <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm">
+                    <div className="p-4 border-t border-gray-100 dark:border-zinc-800/50 flex items-center justify-between text-sm">
                         <div className="flex items-center gap-3">
-                            <span className="text-gray-500 font-medium whitespace-nowrap">
+                            <span className="text-gray-500 dark:text-zinc-400 font-medium whitespace-nowrap">
                                 Affichage de {(currentPage - 1) * itemsPerPage + 1} à {Math.min(currentPage * itemsPerPage, filteredAbsences.length)} sur {filteredAbsences.length}
                             </span>
-                            <div className="flex items-center gap-2 border-l pl-3 hidden sm:flex">
-                                <span className="text-gray-500">Afficher:</span>
+                            <div className="flex items-center gap-2 border-l border-gray-200 dark:border-zinc-800/50 pl-3 hidden sm:flex">
+                                <span className="text-gray-500 dark:text-zinc-400">Afficher:</span>
                                 <select
                                     value={itemsPerPage}
                                     onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                                    className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#ffa000]"
+                                    className="border border-gray-300 dark:border-zinc-700 dark:bg-[#111111] dark:text-zinc-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#ffa000] focus:border-transparent"
                                 >
                                     {[5, 10, 25, 50].map(n => (
                                         <option key={n} value={n}>{n}</option>
@@ -321,10 +321,10 @@ export default function AdminAbsencesPage() {
                             </div>
                         </div>
                         <div className="flex items-center gap-1">
-                            <button disabled={currentPage === 1} onClick={() => setCurrentPage(1)} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Première page">
+                            <button disabled={currentPage === 1} onClick={() => setCurrentPage(1)} className="p-1 border border-gray-300 dark:border-zinc-700 dark:bg-[#111111] dark:text-zinc-400 dark:hover:bg-[#1a1a1a] rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Première page">
                                 <ChevronsLeft size={18} />
                             </button>
-                            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Page précédente">
+                            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="p-1 border border-gray-300 dark:border-zinc-700 dark:bg-[#111111] dark:text-zinc-400 dark:hover:bg-[#1a1a1a] rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Page précédente">
                                 <ChevronLeft size={18} />
                             </button>
 
@@ -340,8 +340,8 @@ export default function AdminAbsencesPage() {
                                             key={i}
                                             onClick={() => setCurrentPage(i + 1)}
                                             className={`w-8 h-8 rounded border transition-colors font-medium flex items-center justify-center ${currentPage === i + 1
-                                                ? 'bg-[#042954] text-white border-[#042954]'
-                                                : 'border-gray-300 text-gray-500 hover:bg-gray-50'
+                                                ? 'bg-[#042954] text-white border-[#042954] dark:bg-[#ffa000] dark:border-[#ffa000] dark:text-[#111111]'
+                                                : 'border-gray-300 text-gray-500 hover:bg-gray-50 dark:border-zinc-700 dark:bg-[#111111] dark:text-zinc-400 dark:hover:bg-[#1a1a1a]'
                                                 }`}
                                         >
                                             {i + 1}
@@ -351,15 +351,15 @@ export default function AdminAbsencesPage() {
                                     (i === 1 && currentPage > 3) ||
                                     (i === totalPages - 2 && currentPage < totalPages - 2)
                                 ) {
-                                    return <span key={i} className="px-1 text-gray-400">...</span>;
+                                    return <span key={i} className="px-1 text-gray-400 dark:text-zinc-500">...</span>;
                                 }
                                 return null;
                             })}
 
-                            <button disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Page suivante">
+                            <button disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="p-1 border border-gray-300 dark:border-zinc-700 dark:bg-[#111111] dark:text-zinc-400 dark:hover:bg-[#1a1a1a] rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Page suivante">
                                 <ChevronRight size={18} />
                             </button>
-                            <button disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(totalPages)} className="p-1 border border-gray-300 rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Dernière page">
+                            <button disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(totalPages)} className="p-1 border border-gray-300 dark:border-zinc-700 dark:bg-[#111111] dark:text-zinc-400 dark:hover:bg-[#1a1a1a] rounded text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Dernière page">
                                 <ChevronsRight size={18} />
                             </button>
                         </div>
@@ -372,7 +372,7 @@ export default function AdminAbsencesPage() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setJustifyingAbsence(null)} />
 
-                    <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden animate-in fade-in zoom-in">
+                    <div className="relative bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden animate-in fade-in zoom-in">
                         <div className="bg-[#042954] px-6 py-4 flex items-center justify-between">
                             <div>
                                 <h3 className="text-lg font-bold text-white">Justifier l&apos;absence</h3>
@@ -387,7 +387,7 @@ export default function AdminAbsencesPage() {
 
                         <form onSubmit={handleJustifierSubmit} className="p-6 space-y-4">
                             <div className="space-y-2">
-                                <label className="text-sm font-bold text-[#333333]">Détails de justification <span className="text-red-500">*</span></label>
+                                <label className="text-sm font-bold text-[#333333] dark:text-slate-100">Détails de justification <span className="text-red-500">*</span></label>
                                 <textarea
                                     required
                                     rows={4}
@@ -399,8 +399,8 @@ export default function AdminAbsencesPage() {
                                 ></textarea>
                             </div>
 
-                            <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
-                                <button type="button" onClick={() => setJustifyingAbsence(null)} className="px-5 py-2.5 font-semibold text-gray-500 hover:bg-gray-50 rounded-lg transition-colors text-sm">
+                            <div className="pt-4 border-t border-gray-100 dark:border-slate-700 flex items-center justify-end gap-3">
+                                <button type="button" onClick={() => setJustifyingAbsence(null)} className="px-5 py-2.5 font-semibold text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:bg-slate-800/50 rounded-lg transition-colors text-sm">
                                     Annuler
                                 </button>
                                 <button

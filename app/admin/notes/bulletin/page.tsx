@@ -19,7 +19,7 @@ interface MoyenneData {
     totalNotes?: number;
 }
 
-const SEMESTRES = ["S1", "S2", "S3", "S4", "S5", "S6"];
+const SEMESTRES = ["S1", "S2", "S3", "S4", "S5"];
 
 export default function BulletinPage() {
     const [etudiants, setEtudiants] = useState<Etudiant[]>([]);
@@ -147,27 +147,27 @@ export default function BulletinPage() {
             <div className="flex items-center gap-4 mb-8">
                 <Link
                     href="/admin/notes"
-                    className="p-2 bg-white rounded-full border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm text-gray-500"
+                    className="p-2 bg-white dark:bg-slate-800 rounded-full border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:bg-slate-800/50 transition-colors shadow-sm text-gray-500 dark:text-slate-400"
                 >
                     <ArrowLeft size={20} />
                 </Link>
                 <div>
-                    <h1 className="text-2xl font-bold text-[#042954] tracking-tight">Génération de Bulletins</h1>
-                    <p className="text-sm text-gray-500">Sélectionnez un étudiant et un semestre pour générer le bulletin</p>
+                    <h1 className="text-[#042954] dark:text-whitexl font-bold text-[#042954] dark:text-white tracking-tight">Génération de Bulletins</h1>
+                    <p className="text-sm text-gray-500 dark:text-slate-400">Sélectionnez un étudiant et un semestre pour générer le bulletin</p>
                 </div>
             </div>
 
             {/* Selection Form */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 mb-6">
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm p-8 mb-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Étudiant */}
                     <div className="space-y-2">
-                        <label htmlFor="etudiant" className="text-sm font-bold text-[#333333]">Étudiant <span className="text-red-500">*</span></label>
+                        <label htmlFor="etudiant" className="text-sm font-bold text-[#333333] dark:text-slate-100">Étudiant <span className="text-red-500">*</span></label>
                         <select
                             id="etudiant"
                             value={selectedEtudiant}
                             onChange={(e) => setSelectedEtudiant(e.target.value)}
-                            className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm"
+                            className="w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm"
                         >
                             <option value="">Sélectionner un étudiant</option>
                             {etudiants.map(e => (
@@ -178,12 +178,12 @@ export default function BulletinPage() {
 
                     {/* Semestre */}
                     <div className="space-y-2">
-                        <label htmlFor="semestre" className="text-sm font-bold text-[#333333]">Semestre <span className="text-red-500">*</span></label>
+                        <label htmlFor="semestre" className="text-sm font-bold text-[#333333] dark:text-slate-100">Semestre <span className="text-red-500">*</span></label>
                         <select
                             id="semestre"
                             value={selectedSemestre}
                             onChange={(e) => setSelectedSemestre(e.target.value)}
-                            className="w-full bg-[#f8f9fa] border border-gray-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white transition-all text-sm"
+                            className="w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm"
                         >
                             {SEMESTRES.map(s => (
                                 <option key={s} value={s}>Semestre {s}</option>
@@ -195,8 +195,8 @@ export default function BulletinPage() {
 
             {/* Moyenne Result Card */}
             {isFetchingMoyenne && (
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 mb-6">
-                    <div className="flex items-center justify-center gap-3 text-gray-500">
+                <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm p-8 mb-6">
+                    <div className="flex items-center justify-center gap-3 text-gray-500 dark:text-slate-400">
                         <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-[#ffa000]"></div>
                         Calcul de la moyenne en cours...
                     </div>
@@ -211,14 +211,14 @@ export default function BulletinPage() {
                                 <Award size={32} className={moyenneData.moyenne >= 10 ? 'text-green-600' : 'text-red-600'} />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-500 font-medium">
+                                <p className="text-sm text-gray-500 dark:text-slate-400 font-medium">
                                     {selectedEtudiantObj ? `${selectedEtudiantObj.nom} ${selectedEtudiantObj.prenom}` : "Étudiant"} — Semestre {selectedSemestre}
                                 </p>
                                 <div className="flex items-baseline gap-2 mt-1">
-                                    <span className={`text-4xl font-bold ${getMoyenneColor(moyenneData.moyenne)}`}>
-                                        {moyenneData.moyenne.toFixed(2)}
+                                    <span className={`text-[#042954] dark:text-whitexl font-bold ${getMoyenneColor(moyenneData.moyenne)}`}>
+                                        {typeof moyenneData.moyenne === "number" ? moyenneData.moyenne.toFixed(2) : "--"}
                                     </span>
-                                    <span className="text-gray-400 text-lg">/ 20</span>
+                                    <span className="text-gray-400 dark:text-slate-500 text-lg">/ 20</span>
                                 </div>
                                 <p className={`text-sm font-bold mt-1 ${getMoyenneColor(moyenneData.moyenne)}`}>
                                     Mention : {moyenneData.mention || getMention(moyenneData.moyenne)}
@@ -241,10 +241,10 @@ export default function BulletinPage() {
 
             {/* Prompt when no selection */}
             {!selectedEtudiant && (
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12">
-                    <div className="text-center text-gray-400">
+                <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm p-12">
+                    <div className="text-center text-gray-400 dark:text-slate-500">
                         <Award size={48} className="mx-auto mb-4 text-gray-300" />
-                        <p className="text-lg font-semibold text-gray-500">Sélectionnez un étudiant</p>
+                        <p className="text-lg font-semibold text-gray-500 dark:text-slate-400">Sélectionnez un étudiant</p>
                         <p className="text-sm mt-1">Choisissez un étudiant et un semestre ci-dessus pour voir la moyenne et générer le bulletin.</p>
                     </div>
                 </div>
