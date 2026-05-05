@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BookOpen, Calendar, FileText, AlertTriangle, Users, LayoutDashboard, Target, TrendingUp, Award } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import RecentNotifications from "@/app/components/RecentNotifications";
 
 export default function EnseignantDashboardPage() {
     const [role, setRole] = useState<string | null>(null);
@@ -117,21 +118,14 @@ export default function EnseignantDashboardPage() {
 
     const renderEnseignantDashboard = () => (
         <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <StatCard title="Total Cours" value={stats?.totalMatieres || 0} subtitle="Matières affectées" icon={BookOpen} color="#03a9f4" />
                 <StatCard title="Notes Saisies" value={stats?.notesSaisies || 0} subtitle="Évaluations" icon={FileText} color="#4caf50" />
                 <StatCard title="Absences" value={stats?.absencesRenseignees || 0} subtitle="Renseignées" icon={AlertTriangle} color="#ff9800" />
+                <StatCard title="Documents" value={stats?.totalDocuments || 0} subtitle={`${stats?.documentsEnAttente || 0} En attente`} icon={FileText} color="#ff9800" />
             </div>
-            <div className="grid grid-cols-1 gap-6 mt-8">
-                 <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm flex items-center gap-6">
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-full">
-                        <Target size={32} className="text-blue-500" />
-                    </div>
-                    <div>
-                        <h3 className="text-xl font-bold text-[#042954] dark:text-white mb-1">Espace Opérationnel</h3>
-                        <p className="text-gray-500 dark:text-slate-400">Vos statistiques montrent une excellente réactivité ce mois-ci. Assurez-vous de vérifier la page "Notes & Résultats" pour complétez vos saisies en retard éventuelles.</p>
-                    </div>
-                </div>
+            <div className="mt-8">
+                <RecentNotifications />
             </div>
         </div>
     );

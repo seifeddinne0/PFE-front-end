@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookOpen, Calendar, FileText, AlertTriangle, Users, LayoutDashboard, Target, TrendingUp, Award } from "lucide-react";
+import { BookOpen, Calendar, FileText, AlertTriangle, Users, LayoutDashboard, Target, TrendingUp, Award, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import RecentNotifications from "@/app/components/RecentNotifications";
 
 export default function EtudiantDashboardPage() {
     const [role, setRole] = useState<string | null>(null);
@@ -78,7 +79,7 @@ export default function EtudiantDashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
                 <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm">
                     <h3 className="text-lg font-bold text-[#042954] dark:text-white mb-6 flex items-center gap-2">
-                        <TrendingUp size={20} className="text-[#ffa000]"/> Statistiques Globales
+                        <TrendingUp size={20} className="text-[#ffa000]" /> Statistiques Globales
                     </h3>
                     <div className="space-y-6">
                         <div>
@@ -102,7 +103,7 @@ export default function EtudiantDashboardPage() {
                     </div>
                 </div>
                 <div className="bg-gradient-to-br from-[#042954] to-[#021833] p-8 rounded-2xl shadow-sm text-white relative overflow-hidden">
-                    <div className="absolute -right-10 -bottom-10 opacity-10"><Target size={150}/></div>
+                    <div className="absolute -right-10 -bottom-10 opacity-10"><Target size={150} /></div>
                     <h3 className="text-lg font-bold mb-2">Objectifs de session</h3>
                     <p className="text-blue-200 mb-6 text-sm">Progression vers la fin du semestre d'automne</p>
                     <div className="flex items-end gap-2 mb-2">
@@ -122,26 +123,42 @@ export default function EtudiantDashboardPage() {
                 <StatCard title="Notes Saisies" value={stats?.notesSaisies || 0} subtitle="Évaluations" icon={FileText} color="#4caf50" />
                 <StatCard title="Absences" value={stats?.absencesRenseignees || 0} subtitle="Renseignées" icon={AlertTriangle} color="#ff9800" />
             </div>
-            <div className="grid grid-cols-1 gap-6 mt-8">
-                 <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm flex items-center gap-6">
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-full">
-                        <Target size={32} className="text-blue-500" />
-                    </div>
-                    <div>
-                        <h3 className="text-xl font-bold text-[#042954] dark:text-white mb-1">Espace Opérationnel</h3>
-                        <p className="text-gray-500 dark:text-slate-400">Vos statistiques montrent une excellente réactivité ce mois-ci. Assurez-vous de vérifier la page "Notes & Résultats" pour complétez vos saisies en retard éventuelles.</p>
-                    </div>
-                </div>
-            </div>
         </div>
     );
 
     const renderEtudiantDashboard = () => (
         <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatCard title="Mes Cours" value={stats?.totalMatieres || 0} subtitle="Inscrits" icon={BookOpen} color="#03a9f4" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                {stats?.isPfe ? (
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden group">
+                        <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-10 transition-transform group-hover:scale-150 duration-500" style={{ backgroundColor: "#03a9f4" }}></div>
+                        <div className="flex items-center justify-between mb-4 relative z-10">
+                            <h3 className="text-gray-500 dark:text-slate-400 text-sm font-bold uppercase tracking-wider">Mes Cours</h3>
+                            <div className="p-3 rounded-xl shadow-sm" style={{ backgroundColor: "#03a9f415", color: "#03a9f4" }}>
+                                <BookOpen size={22} strokeWidth={2.5} />
+                            </div>
+                        </div>
+                        <div className="flex items-end gap-3 relative z-10">
+                            <span className="text-[#042954] dark:text-white font-black text-2xl tracking-tight">PFE</span>
+                            <span className="text-sm font-semibold mb-1" style={{ color: "#03a9f4" }}>Projet de Fin d'Etudes</span>
+                        </div>
+                    </div>
+                ) : (
+                    <StatCard
+                        title="Mes Cours"
+                        value={stats?.totalMatieres || 0}
+                        subtitle={stats?.semestreActuel ? `Semestre ${stats.semestreActuel}` : "Inscrits"}
+                        icon={BookOpen}
+                        color="#03a9f4"
+                    />
+                )}
                 <StatCard title="Absences" value={stats?.totalAbsences || 0} subtitle="Justifiées / Non" icon={AlertTriangle} color="#f44336" />
                 <StatCard title="Évaluations" value={stats?.totalEvaluations || 0} subtitle="Notes reçues" icon={Award} color="#9c27b0" />
+                <StatCard title="Documents" value={stats?.totalDocuments || 0} subtitle={`${stats?.documentsEnAttente || 0} En attente`} icon={FileText} color="#ff9800" />
+                <StatCard title="Factures" value={stats?.totalFactures || 0} subtitle={`${stats?.facturesNonPayees || 0} Non payees`} icon={CreditCard} color="#4caf50" />
+            </div>
+            <div className="mt-8">
+                <RecentNotifications />
             </div>
         </div>
     );
@@ -167,7 +184,7 @@ export default function EtudiantDashboardPage() {
                     </div>
                     {role !== "ROLE_ADMIN" && (
                         <div className="flex-shrink-0">
-                            <Link 
+                            <Link
                                 href="/etudiant/profile"
                                 className="group relative inline-flex items-center justify-center bg-[#ffa000] text-[#042954] dark:text-white font-black py-4 px-8 rounded-xl transition-all shadow-xl hover:shadow-[#ffa000]/30 hover:scale-105 overflow-hidden"
                             >
