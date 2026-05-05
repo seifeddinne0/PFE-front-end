@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, API_URL } from "@/lib/api";
 import toast from "react-hot-toast";
-import { FileText, FileCheck, FileX, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, AlertCircle } from "lucide-react";
+import { FileText, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, AlertCircle, Upload, X } from "lucide-react";
 
 interface Facture {
     id: number;
@@ -12,24 +12,36 @@ interface Facture {
     description?: string;
     montant: number;
     datePaiement?: string;
+    dateEcheance?: string;
     preuvePaiement?: string;
     statut: string;
+    etudiantId?: number;
+}
+
+interface PaiementResult {
+    statut: "VALIDE" | "REJETE" | "EN_ATTENTE";
+    motifRejet?: string;
+    datePaiement?: string;
+    montant?: number;
 }
 
 export default function EtudiantFacturesPage() {
     const [factures, setFactures] = useState<Facture[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-
-    // Filters
+    const [etudiantId, setEtudiantId] = useState<number | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [statutFilter, setStatutFilter] = useState("Tous");
+    const statutOptions = ["Tous", "PAYEE", "NON_PAYEE", "REJETEE"];
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
-    const [confirmationDates, setConfirmationDates] = useState<Record<number, string>>({});
-    const [confirmationFiles, setConfirmationFiles] = useState<Record<number, File | null>>({});
-    const [uploadingFactureId, setUploadingFactureId] = useState<number | null>(null);
+    const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+    const [selectedFacture, setSelectedFacture] = useState<Facture | null>(null);
+    const [receiptFile, setReceiptFile] = useState<File | null>(null);
+    const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [paiementResult, setPaiementResult] = useState<PaiementResult | null>(null);
 
     const fetchFactures = async () => {
         setIsLoading(true);
@@ -49,6 +61,15 @@ export default function EtudiantFacturesPage() {
         }
     };
 
+    const fetchEtudiantId = async () => {
+        try {
+            const profile = await api.get("/api/etudiant/profil");
+            if (profile?.id) setEtudiantId(profile.id);
+        } catch (error: any) {
+            toast.error(error.message || "Impossible de récupérer le profil étudiant.");
+        }
+    };
+
     useEffect(() => {
         const token = localStorage.getItem("token") || sessionStorage.getItem("token");
         if (!token) {
@@ -56,6 +77,7 @@ export default function EtudiantFacturesPage() {
             return;
         }
         fetchFactures();
+        fetchEtudiantId();
     }, []);
 
     const formatMontant = (mnt?: number) => {
@@ -71,10 +93,10 @@ export default function EtudiantFacturesPage() {
     const getStatutBadge = (statut: string) => {
         switch (statut) {
             case 'PAYEE': return <span className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 px-2.5 py-1 rounded-full text-xs font-bold">PAYÉE</span>;
-            case 'NON_PAYEE': return <span className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 px-2.5 py-1 rounded-full text-xs font-bold">NON PAYÉE</span>;
-            case 'EN_ATTENTE': return <span className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 px-2.5 py-1 rounded-full text-xs font-bold">EN ATTENTE</span>;
+            case 'NON_PAYEE': return <span className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 px-2.5 py-1 rounded-full text-xs font-bold">NON PAYÉE</span>;
+            case 'REJETEE': return <span className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 px-2.5 py-1 rounded-full text-xs font-bold">REJETÉE</span>;
             case 'ANNULEE': return <span className="bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-zinc-300 px-2.5 py-1 rounded-full text-xs font-bold">ANNULÉE</span>;
-            default: return <span className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2.5 py-1 rounded-full text-xs font-bold">{statut}</span>;
+            default: return <span className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 px-2.5 py-1 rounded-full text-xs font-bold">{statut}</span>;
         }
     };
 
@@ -84,40 +106,84 @@ export default function EtudiantFacturesPage() {
         return `${API_URL}${path}`;
     };
 
-    const handleReceiptFileChange = (factureId: number, file: File | null) => {
-        setConfirmationFiles(prev => ({ ...prev, [factureId]: file }));
+    const resetPaymentModal = () => {
+        if (receiptPreviewUrl) {
+            URL.revokeObjectURL(receiptPreviewUrl);
+        }
+        setReceiptFile(null);
+        setReceiptPreviewUrl(null);
+        setPaiementResult(null);
     };
 
-    const handleConfirmPayment = async (factureId: number) => {
-        const datePaiement = confirmationDates[factureId];
-        const file = confirmationFiles[factureId];
+    const openPayModal = (facture: Facture) => {
+        setSelectedFacture(facture);
+        setIsPayModalOpen(true);
+        resetPaymentModal();
+    };
 
-        if (!datePaiement) {
-            toast.error("Veuillez sélectionner une date de paiement.");
+    const closePayModal = () => {
+        setIsPayModalOpen(false);
+        setSelectedFacture(null);
+        resetPaymentModal();
+    };
+
+    const handleReceiptFileChange = (file: File | null) => {
+        if (receiptPreviewUrl) {
+            URL.revokeObjectURL(receiptPreviewUrl);
+        }
+        setReceiptFile(file);
+        if (file && file.type.startsWith("image/")) {
+            setReceiptPreviewUrl(URL.createObjectURL(file));
+        } else {
+            setReceiptPreviewUrl(null);
+        }
+    };
+
+    const handleSubmitReceipt = async () => {
+        if (!selectedFacture) return;
+        if (!receiptFile) {
+            toast.error("Veuillez uploader un reçu.");
             return;
         }
-
-        if (!file) {
-            toast.error("Veuillez uploader une photo du reçu.");
+        if (!etudiantId) {
+            toast.error("Profil étudiant introuvable.");
             return;
         }
 
         try {
-            setUploadingFactureId(factureId);
+            setIsSubmitting(true);
+            setPaiementResult(null);
             const formData = new FormData();
-            formData.append("datePaiement", datePaiement);
-            formData.append("image", file);
+            formData.append("factureId", selectedFacture.id.toString());
+            formData.append("etudiantId", etudiantId.toString());
+            formData.append("receipt", receiptFile);
 
-            await api.postFormData(`/api/etudiant/factures/${factureId}/confirmation-paiement`, formData);
-            toast.success("Confirmation de paiement envoyée.");
+            const token = sessionStorage.getItem("token") || localStorage.getItem("token");
+            const res = await fetch(`${API_URL}/api/paiements/soumettre`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`
+                },
+                body: formData
+            });
 
-            setConfirmationDates(prev => ({ ...prev, [factureId]: "" }));
-            setConfirmationFiles(prev => ({ ...prev, [factureId]: null }));
+            const payload = await res.json();
+            if (!res.ok) {
+                throw new Error(payload?.message || "Erreur lors de l'envoi du reçu.");
+            }
+
+            setPaiementResult({
+                statut: payload?.statut,
+                motifRejet: payload?.motifRejet,
+                datePaiement: payload?.datePaiement,
+                montant: payload?.montant
+            });
+
             await fetchFactures();
         } catch (error: any) {
-            toast.error(error.message || "Erreur lors de l'envoi de la confirmation.");
+            toast.error(error.message || "Erreur lors de l'envoi du reçu.");
         } finally {
-            setUploadingFactureId(null);
+            setIsSubmitting(false);
         }
     };
 
@@ -139,6 +205,11 @@ export default function EtudiantFacturesPage() {
 
     const totalPages = Math.ceil(filteredFactures.length / itemsPerPage);
     const paginatedFactures = filteredFactures.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    const pageNumbers = [...Array(currentPage).keys()].map(() => currentPage - 1);
+    if (!pageNumbers.includes(totalPages)) {
+        pageNumbers.push(totalPages);
+    }
 
     return (
         <div className="space-y-6">
@@ -190,9 +261,28 @@ export default function EtudiantFacturesPage() {
                                 <option value="Tous">Tous les statuts</option>
                                 <option value="PAYEE">Payée</option>
                                 <option value="NON_PAYEE">Non Payée</option>
-                                <option value="EN_ATTENTE">En Attente</option>
-                                <option value="ANNULEE">Annulée</option>
+                                <option value="REJETEE">Rejetée</option>
                             </select>
+                        </div>
+                        <div className="relative">
+                            <button onClick={() => {
+                                const dropdown = document.getElementById("statut-dropdown-etudiant");
+                                dropdown?.classList.toggle("hidden");
+                            }} className="flex items-center justify-between w-full md:w-48 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <span>{statutFilter === "Tous" ? "Tous les statuts" : statutFilter.replace('_', ' ')}</span>
+                                <Filter size={16} className="text-gray-500" />
+                            </button>
+                            <div id="statut-dropdown-etudiant" className="hidden absolute z-10 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg">
+                                {statutOptions.map(option => (
+                                    <a key={option} href="#" onClick={(e) => {
+                                        e.preventDefault();
+                                        setStatutFilter(option);
+                                        document.getElementById("statut-dropdown-etudiant")?.classList.add("hidden");
+                                    }} className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600">
+                                        {option === "Tous" ? "Tous les statuts" : option.replace('_', ' ')}
+                                    </a>
+                                ))}
+                            </div>
                         </div>
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -215,7 +305,8 @@ export default function EtudiantFacturesPage() {
                                 <th className="p-4 font-semibold">Type</th>
                                 <th className="p-4 font-semibold">Description</th>
                                 <th className="p-4 font-semibold">Montant</th>
-                                <th className="p-4 font-semibold">Confirmation Paiement</th>
+                                <th className="p-4 font-semibold">Reçu</th>
+                                <th className="p-4 font-semibold">Paiement</th>
                                 <th className="p-4 font-semibold">Statut</th>
                                 <th className="p-4 font-semibold">Date Paiement</th>
                             </tr>
@@ -223,14 +314,14 @@ export default function EtudiantFacturesPage() {
                         <tbody>
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={7} className="p-8 text-center text-gray-500 flex justify-center items-center gap-2">
+                                    <td colSpan={8} className="p-8 text-center text-gray-500 flex justify-center items-center gap-2">
                                         <div className="w-5 h-5 border-2 border-[#042954] border-t-transparent rounded-full animate-spin"></div>
                                         Chargement en cours...
                                     </td>
                                 </tr>
                             ) : paginatedFactures.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="p-8 text-center text-gray-500">Aucune facture trouvée.</td>
+                                    <td colSpan={8} className="p-8 text-center text-gray-500">Aucune facture trouvée.</td>
                                 </tr>
                             ) : (
                                 paginatedFactures.map((facture) => {
@@ -256,52 +347,29 @@ export default function EtudiantFacturesPage() {
                                                 {formatMontant(facture.montant)}
                                             </td>
                                             <td className="p-4 text-sm">
-                                                <div className="space-y-2">
-                                                    {facture.preuvePaiement ? (
-                                                        <div className="space-y-1">
-                                                            <a
-                                                                href={buildUploadUrl(facture.preuvePaiement)}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className="text-blue-700 hover:underline font-medium"
-                                                            >
-                                                                Voir le reçu
-                                                            </a>
-                                                            {facture.statut === "EN_ATTENTE" && (
-                                                                <div className="text-xs text-orange-700 bg-orange-50 border border-orange-200 px-2 py-1 rounded inline-block">
-                                                                    En attente de validation
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-gray-500">Non envoyé</span>
-                                                    )}
-
-                                                    {(facture.statut === "NON_PAYEE" || facture.statut === "EN_ATTENTE") && (
-                                                        <div className="space-y-1">
-                                                            <input
-                                                                type="date"
-                                                                value={confirmationDates[facture.id] || ""}
-                                                                onChange={(e) => setConfirmationDates(prev => ({ ...prev, [facture.id]: e.target.value }))}
-                                                                className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
-                                                            />
-                                                            <input
-                                                                type="file"
-                                                                accept="image/*"
-                                                                onChange={(e) => handleReceiptFileChange(facture.id, e.target.files?.[0] || null)}
-                                                                className="w-full text-xs"
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                disabled={uploadingFactureId === facture.id}
-                                                                onClick={() => handleConfirmPayment(facture.id)}
-                                                                className="px-2 py-1 text-xs rounded bg-[#042954] text-white hover:bg-[#031f40] disabled:opacity-60"
-                                                            >
-                                                                {uploadingFactureId === facture.id ? "Envoi..." : "Confirmer paiement"}
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                {facture.preuvePaiement ? (
+                                                    <a
+                                                        href={buildUploadUrl(facture.preuvePaiement)}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="text-blue-700 hover:underline font-medium"
+                                                    >
+                                                        Voir le reçu
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-gray-500">Non envoyé</span>
+                                                )}
+                                            </td>
+                                            <td className="p-4 text-sm">
+                                                {(facture.statut === "NON_PAYEE" || facture.statut === "EN_ATTENTE" || facture.statut === "REJETEE") && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openPayModal(facture)}
+                                                        className="px-3 py-1.5 text-xs rounded bg-[#042954] text-white hover:bg-[#031f40]"
+                                                    >
+                                                        Payer
+                                                    </button>
+                                                )}
                                             </td>
                                             <td className="p-4">
                                                 {getStatutBadge(facture.statut)}
@@ -345,7 +413,7 @@ export default function EtudiantFacturesPage() {
                                         
                                         <div className="space-y-2 bg-white/60 p-3 rounded-lg border border-gray-100 text-sm">
                                             <div className="flex justify-between items-center py-1 border-b border-gray-200">
-                                                <span className="text-gray-500">Confirmation</span>
+                                                <span className="text-gray-500">Reçu</span>
                                                 {facture.preuvePaiement ? (
                                                     <a
                                                         href={buildUploadUrl(facture.preuvePaiement)}
@@ -369,27 +437,14 @@ export default function EtudiantFacturesPage() {
                                                     {facture.description || "Aucune description"}
                                                 </div>
                                             </div>
-                                            {(facture.statut === "NON_PAYEE" || facture.statut === "EN_ATTENTE") && (
-                                                <div className="space-y-2 pt-2 border-t border-gray-200">
-                                                    <input
-                                                        type="date"
-                                                        value={confirmationDates[facture.id] || ""}
-                                                        onChange={(e) => setConfirmationDates(prev => ({ ...prev, [facture.id]: e.target.value }))}
-                                                        className="w-full px-3 py-2 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
-                                                    />
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*"
-                                                        onChange={(e) => handleReceiptFileChange(facture.id, e.target.files?.[0] || null)}
-                                                        className="w-full text-xs"
-                                                    />
+                                            {(facture.statut === "NON_PAYEE" || facture.statut === "EN_ATTENTE" || facture.statut === "REJETEE") && (
+                                                <div className="pt-2 border-t border-gray-200">
                                                     <button
                                                         type="button"
-                                                        disabled={uploadingFactureId === facture.id}
-                                                        onClick={() => handleConfirmPayment(facture.id)}
-                                                        className="w-full px-3 py-2 text-xs rounded bg-[#042954] text-white hover:bg-[#031f40] disabled:opacity-60"
+                                                        onClick={() => openPayModal(facture)}
+                                                        className="w-full px-3 py-2 text-xs rounded bg-[#042954] text-white hover:bg-[#031f40]"
                                                     >
-                                                        {uploadingFactureId === facture.id ? "Envoi..." : "Confirmer paiement"}
+                                                        Payer
                                                     </button>
                                                 </div>
                                             )}
@@ -442,9 +497,9 @@ export default function EtudiantFacturesPage() {
                                     key={i}
                                     onClick={() => setCurrentPage(i + 1)}
                                     className={`w-8 h-8 rounded border transition-colors font-medium flex items-center justify-center ${currentPage === i + 1
-                                        ? 'bg-[#042954] text-white border-[#042954]'
-                                        : 'border-gray-300 text-gray-500 hover:bg-gray-50'
-                                        }`}
+                                    ? 'bg-[#042954] text-white border-[#042954]'
+                                    : 'border-gray-300 text-gray-500 hover:bg-gray-50'
+                                    }`}
                                 >
                                     {i + 1}
                                 </button>
@@ -468,6 +523,109 @@ export default function EtudiantFacturesPage() {
                     </div>
                 )}
             </div>
+
+            {isPayModalOpen && selectedFacture && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
+                        <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+                            <h2 className="text-lg font-bold text-[#042954]">Paiement — {selectedFacture.numero}</h2>
+                            <button onClick={closePayModal} className="text-gray-400 hover:text-gray-600">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-5 space-y-4 overflow-y-auto flex-1">
+                            <div className="bg-gray-50 border border-gray-100 rounded-lg p-4 text-sm text-gray-700">
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500">Montant</span>
+                                    <span className="font-semibold">{formatMontant(selectedFacture.montant)}</span>
+                                </div>
+                                <div className="flex justify-between mt-2">
+                                    <span className="text-gray-500">Date d'échéance</span>
+                                    <span className="font-medium">{formatDate(selectedFacture.dateEcheance)}</span>
+                                </div>
+                            </div>
+
+                            <div
+                                className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center text-sm text-gray-600 hover:border-[#ffa000] transition-colors"
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    const file = e.dataTransfer.files?.[0] || null;
+                                    handleReceiptFileChange(file);
+                                }}
+                            >
+                                <input
+                                    id="receipt-upload"
+                                    type="file"
+                                    accept=".jpg,.jpeg,.png,.pdf"
+                                    className="hidden"
+                                    onChange={(e) => handleReceiptFileChange(e.target.files?.[0] || null)}
+                                />
+                                <label htmlFor="receipt-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                                    <Upload size={22} className="text-[#042954]" />
+                                    <span>Glissez-déposez ou cliquez pour uploader (JPG, PNG, PDF)</span>
+                                </label>
+                            </div>
+
+                            {receiptFile && (
+                                <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 text-sm text-gray-700">
+                                    <div className="font-medium">Fichier sélectionné</div>
+                                    <div className="mt-1">{receiptFile.name}</div>
+                                    {receiptPreviewUrl && (
+                                        <img src={receiptPreviewUrl} alt="Reçu" className="mt-3 max-h-60 mx-auto rounded" />
+                                    )}
+                                </div>
+                            )}
+
+                            {isSubmitting && (
+                                <div className="text-sm text-orange-700 bg-orange-50 border border-orange-200 px-3 py-2 rounded">
+                                    ⏳ Analyse du reçu en cours...
+                                </div>
+                            )}
+
+                            {paiementResult && (
+                                <div className={`border rounded-lg p-4 text-sm ${paiementResult.statut === "VALIDE" ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800"}`}>
+                                    {paiementResult.statut === "VALIDE" ? (
+                                        <>
+                                            <div className="font-bold">✅ Paiement validé avec succès</div>
+                                            <div>Votre paiement a été vérifié et accepté.</div>
+                                            <div className="mt-2">Date de paiement: {paiementResult.datePaiement ? formatDate(paiementResult.datePaiement) : "-"}</div>
+                                            <div>Montant: {paiementResult.montant != null ? formatMontant(paiementResult.montant) : "-"}</div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="font-bold">❌ Paiement rejeté</div>
+                                            <div className="mt-2 text-sm text-red-800">Raisons du rejet :</div>
+                                            <ul className="list-disc pl-5 mt-1">
+                                                {(paiementResult.motifRejet || "Reçu invalide").split(' + ').map((motif, idx) => (
+                                                    <li key={idx} className="text-xs text-red-700 mt-1">{motif}</li>
+                                                ))}
+                                            </ul>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
+                            {paiementResult?.statut === "REJETE" && (
+                                <button onClick={() => { resetPaymentModal(); }} className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">
+                                    Réessayer
+                                </button>
+                            )}
+                            <button onClick={closePayModal} className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">
+                                Fermer
+                            </button>
+                            <button
+                                onClick={handleSubmitReceipt}
+                                disabled={isSubmitting}
+                                className="px-4 py-2 text-white bg-[#042954] hover:bg-[#031f40] rounded-lg text-sm disabled:opacity-60"
+                            >
+                                Soumettre le reçu
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

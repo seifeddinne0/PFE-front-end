@@ -5,6 +5,7 @@ import { Plus, Edit2, Trash2, Save, X, ChevronLeft, ChevronRight, ChevronsLeft, 
 import Link from "next/link";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 interface Etudiant {
     id: number;
@@ -48,6 +49,7 @@ export default function DashboardNotesPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(5);
+    const { confirm } = useConfirm();
 
     // Edit modal
     const [editingNote, setEditingNote] = useState<Note | null>(null);
@@ -158,7 +160,13 @@ export default function DashboardNotesPage() {
 
     // --- Delete ---
     const handleDelete = async (id: number) => {
-        if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette note ?")) return;
+        const isConfirmed = await confirm({
+            title: "Supprimer la note",
+            message: "Voulez-vous vraiment supprimer cette note ?",
+            confirmText: "Supprimer",
+            variant: "danger"
+        });
+        if (!isConfirmed) return;
 
         try {
             await api.delete(`/api/admin/notes/${id}`);

@@ -5,12 +5,12 @@ export default function AidePage() {
     return (
         <div className="min-h-screen font-sans bg-[#f0f1f3] dark:bg-slate-900 text-[#333333] dark:text-slate-100 flex flex-col">
             {/* Navigation */}
-            <nav className="bg-[#042954] text-white py-4 px-6 md:px-12 flex items-center justify-between sticky top-0 z-50 shadow-md">
+            <nav className="bg-[#042954] dark:bg-black text-white py-4 px-6 md:px-12 flex items-center justify-between sticky top-0 z-50 shadow-md">
                 <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
                     <div className="bg-[#ffa000] p-2 rounded shadow-sm">
                         <GraduationCap size={24} className="text-white" />
                     </div>
-                    <span className="text-[#042954] dark:text-whitexl font-bold tracking-tight">Gestion<span className="font-light text-white/80">Ac</span></span>
+                    <span className="text-white font-bold tracking-tight text-xl">Gestion<span className="font-light text-white/80">Ac</span></span>
                 </Link>
 
                 <div className="flex items-center gap-4">
@@ -153,7 +153,7 @@ export default function AidePage() {
             </main>
 
             {/* Footer */}
-            <footer className="bg-[#021f42] text-white/60 py-8 px-6 mt-auto">
+            <footer className="bg-[#021f42] dark:bg-black text-white/60 py-8 px-6 mt-auto">
                 <div className="container mx-auto max-w-6xl flex flex-col items-center gap-2">
                     <div className="flex items-center gap-2 text-white/80">
                         <GraduationCap size={20} className="text-[#ffa000]" />

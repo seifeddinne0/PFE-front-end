@@ -6,12 +6,12 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen font-sans bg-[#f0f1f3] dark:bg-slate-900 text-[#333333] dark:text-slate-100">
       {/* Navigation */}
-      <nav className="bg-[#042954] text-white py-4 px-6 md:px-12 flex items-center justify-between sticky top-0 z-50 shadow-md">
+      <nav className="bg-[#042954] dark:bg-black text-white py-4 px-6 md:px-12 flex items-center justify-between sticky top-0 z-50 shadow-md">
         <div className="flex items-center gap-2">
           <div className="bg-[#ffa000] p-2 rounded shadow-sm">
             <GraduationCap size={24} className="text-white" />
           </div>
-          <span className="text-[#042954] dark:text-whitexl font-bold tracking-tight">Gestion<span className="font-light text-white/80">Ac</span></span>
+          <span className="text-white font-bold tracking-tight text-xl">Gestion<span className="font-light opacity-80">Ac</span></span>
         </div>
 
         <div className="hidden md:flex items-center gap-8 text-sm font-medium">
@@ -32,7 +32,7 @@ export default function LandingPage() {
       <section id="accueil" className="bg-white dark:bg-slate-800 py-20 px-6 md:px-12 border-b border-gray-200 dark:border-slate-700">
         <div className="container mx-auto max-w-6xl flex flex-col md:flex-row items-center gap-12">
           <div className="flex-1 space-y-8">
-            <h1 className="text-[#042954] dark:text-whitexl md:text-6xl font-extrabold text-[#042954] dark:text-white leading-tight">
+            <h1 className="text-[#042954] dark:text-white text-4xl md:text-6xl font-extrabold leading-tight">
               L&apos;excellence éducative <br />pour <span className="text-[#ffa000]">étudiants</span> et <span className="text-[#03a9f4]">professeurs</span>
             </h1>
             <p className="text-lg text-gray-600 dark:text-slate-300 max-w-xl leading-relaxed">
@@ -72,7 +72,7 @@ export default function LandingPage() {
       <section id="fonctionnalites" className="py-20 px-6 md:px-12 bg-[#f0f1f3] dark:bg-slate-900">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-[#042954] dark:text-whitexl font-bold text-[#042954] dark:text-white mb-4">Fonctionnalités Principales</h2>
+            <h2 className="text-3xl font-bold text-[#042954] dark:text-white mb-4">Fonctionnalités Principales</h2>
             <p className="text-gray-600 dark:text-slate-300 max-w-2xl mx-auto text-lg">Tout ce dont votre institut académique a besoin, consolidé dans une interface unique au design épuré.</p>
           </div>
 
@@ -112,7 +112,7 @@ export default function LandingPage() {
         <div className="container mx-auto max-w-6xl">
           <div className="grid md:grid-cols-2 gap-16 items-center">
             <div>
-              <h2 className="text-3xl md:text-[#042954] dark:text-whitexl font-bold text-[#042954] dark:text-white mb-6">Conçu pour unir<br />étudiants et enseignants</h2>
+              <h2 className="text-3xl font-bold text-[#042954] dark:text-white mb-6">Conçu pour unir<br />étudiants et enseignants</h2>
               <div className="space-y-6">
                 <div className="flex gap-4">
                   <div className="mt-1 bg-[#ffa000] text-white rounded-full p-1 flex-shrink-0 w-6 h-6 flex items-center justify-center">
@@ -148,7 +148,7 @@ export default function LandingPage() {
               <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#03a9f4]/20 blur-[60px]" />
 
               <div className="relative z-10">
-                <h3 className="text-[#042954] dark:text-whitexl font-bold mb-4">Rejoignez la révolution numérique</h3>
+                <h3 className="text-white text-2xl font-bold mb-4">Rejoignez la révolution numérique</h3>
                 <p className="mb-8 text-white/80">
                   Notre mission est de vous offrir la meilleure expérience numérique pour optimiser votre gestion quotidienne.
                 </p>
@@ -171,7 +171,7 @@ export default function LandingPage() {
       {/* Call to Action */}
       <section className="py-24 px-6 text-center bg-[#ffa000]">
         <div className="container mx-auto max-w-4xl relative z-10">
-          <h2 className="text-[#042954] dark:text-whitexl md:text-[#042954] dark:text-whitexl font-bold text-white mb-6 tracking-tight">Votre espace académique vous attend</h2>
+          <h2 className="text-white text-3xl md:text-5xl font-bold mb-6 tracking-tight">Votre espace académique vous attend</h2>
           <p className="text-xl text-white/90 mb-10 max-w-2xl mx-auto">
             Embarquez dans une nouvelle ère de l&apos;éducation. Connectez-vous dès maintenant pour vivre une expérience académique fluide, connectée et enrichissante.
           </p>
@@ -184,7 +184,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-[#021f42] text-white/60 py-12 px-6">
+      <footer className="bg-[#021f42] dark:bg-black text-white/60 py-12 px-6">
         <div className="container mx-auto max-w-6xl flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2 text-white">
             <GraduationCap size={24} className="text-[#ffa000]" />

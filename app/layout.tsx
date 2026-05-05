@@ -12,6 +12,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+import { ConfirmProvider } from "@/components/ConfirmProvider";
+
 export const metadata: Metadata = {
   title: "Gestion Académique - Gestion Universitaire Moderne",
   description: "La plateforme ultime pour la gestion moderne des étudiants et des activités académiques.",
@@ -28,7 +30,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        {children}
+        <ConfirmProvider>
+          {children}
+        </ConfirmProvider>
       </body>
     </html>
   );

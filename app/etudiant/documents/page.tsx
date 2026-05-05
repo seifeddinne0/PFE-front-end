@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Download, FileText, FileBadge, CheckCircle, Clock, Send, ChevronRight, Briefcase, GraduationCap, XCircle, Building2, UserCircle2, Filter, Check } from "lucide-react";
+import { Plus, Download, FileText, FileBadge, CheckCircle, Clock, ChevronRight, Briefcase, GraduationCap, XCircle, Building2, UserCircle2, Filter, Check, Send } from "lucide-react";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
 
@@ -28,15 +28,13 @@ interface DocumentDemande {
 
 interface DocumentStats {
     enAttente: number;
-    enCoursValidation: number;
     validees: number;
-    envoyees: number;
+    rejetees: number;
 }
 
 const DOCUMENT_TYPES = [
     { id: "ATTESTATION_PRESENCE", label: "Attestation de Présence", icon: <FileBadge size={24}/>, desc: "Demander une attestation signée par 2 enseignants" },
     { id: "RELEVE_NOTES", label: "Relevé de Notes", icon: <GraduationCap size={24}/>, desc: "Obtenir votre relevé de notes officiel" },
-    { id: "FACTURE_PAIEMENT", label: "Facture de Paiement", icon: <FileText size={24}/>, desc: "Facture pour vos frais de scolarité" },
     { id: "DEMANDE_STAGE", label: "Demande de Stage", icon: <Briefcase size={24}/>, desc: "Initier une procédure de stage" },
     { id: "VALIDATION_STAGE", label: "Validation de Stage", icon: <CheckCircle size={24}/>, desc: "Faire valider votre stage par l'administration" },
     { id: "ATTESTATION_REUSSITE", label: "Attestation de Réussite", icon: <GraduationCap size={24}/>, desc: "Certificat de réussite" },
@@ -45,11 +43,12 @@ const DOCUMENT_TYPES = [
 
 export default function EtudiantDocumentsPage() {
     const [documents, setDocuments] = useState<DocumentDemande[]>([]);
-    const [stats, setStats] = useState<DocumentStats>({ enAttente: 0, enCoursValidation: 0, validees: 0, envoyees: 0 });
+    const [stats, setStats] = useState<DocumentStats>({ enAttente: 0, validees: 0, rejetees: 0 });
     const [enseignants, setEnseignants] = useState<Enseignant[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     // Filtre
     const [statutFilter, setStatutFilter] = useState("Tous");
+    const [studentLevelCode, setStudentLevelCode] = useState<string>("");
     
     // Create Modal States
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -68,29 +67,13 @@ export default function EtudiantDocumentsPage() {
             const data = await api.get("/api/etudiant/documents");
             if (Array.isArray(data)) {
                 setDocuments(data);
-                
-                // Calculer les stats localement si pas d'API /stats pour l'étudiant
-                const initialStats = { enAttente: 0, enCoursValidation: 0, validees: 0, envoyees: 0 };
-                data.forEach(doc => {
-                    if (doc.statut === 'EN_ATTENTE') initialStats.enAttente++;
-                    else if (doc.statut === 'EN_COURS_VALIDATION') initialStats.enCoursValidation++;
-                    else if (doc.statut === 'VALIDEE') initialStats.validees++;
-                    else if (doc.statut === 'ENVOYEE') initialStats.envoyees++;
-                });
-                setStats(initialStats);
+                setStats(computeStats(data));
             } else if (data && Array.isArray(data.content)) {
                 setDocuments(data.content);
-                // Calcul des stats
-                const initialStats = { enAttente: 0, enCoursValidation: 0, validees: 0, envoyees: 0 };
-                data.content.forEach((doc: any) => {
-                    if (doc.statut === 'EN_ATTENTE') initialStats.enAttente++;
-                    else if (doc.statut === 'EN_COURS_VALIDATION') initialStats.enCoursValidation++;
-                    else if (doc.statut === 'VALIDEE') initialStats.validees++;
-                    else if (doc.statut === 'ENVOYEE') initialStats.envoyees++;
-                });
-                setStats(initialStats);
+                setStats(computeStats(data.content));
             } else {
                 setDocuments([]);
+                setStats({ enAttente: 0, validees: 0, rejetees: 0 });
             }
         } catch (error: any) {
             toast.error(error.message || "Erreur lors du chargement des documents.");
@@ -112,9 +95,18 @@ export default function EtudiantDocumentsPage() {
         }
     };
 
+    const fetchStudentInfo = async () => {
+        try {
+            const data = await api.get("/api/etudiant/dashboard");
+            setStudentLevelCode(data.niveauCode || "");
+        } catch (error) {
+            console.error("Erreur chargement niveau", error);
+        }
+    };
+
     const loadData = async () => {
         setIsLoading(true);
-        await Promise.all([fetchDocuments(), fetchEnseignants()]);
+        await Promise.all([fetchDocuments(), fetchEnseignants(), fetchStudentInfo()]);
         setIsLoading(false);
     };
 
@@ -220,13 +212,12 @@ export default function EtudiantDocumentsPage() {
     };
 
     const getStatutBadge = (statut: string) => {
-        switch (statut) {
+        const normalized = normalizeStatut(statut);
+        switch (normalized) {
             case 'EN_ATTENTE': return <span className="bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">EN ATTENTE</span>;
-            case 'EN_COURS_VALIDATION': return <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">EN COURS VALIDATION</span>;
             case 'VALIDEE': return <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">VALIDÉE</span>;
             case 'REJETEE': return <span className="bg-red-100 text-red-700 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">REJETÉE</span>;
-            case 'ENVOYEE': return <span className="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">ENVOYÉE</span>;
-            default: return <span className="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">{statut}</span>;
+            default: return <span className="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">{normalized}</span>;
         }
     };
 
@@ -243,10 +234,27 @@ export default function EtudiantDocumentsPage() {
 
     const isPresenceAttestation = (typeDocument?: string) => typeDocument === "ATTESTATION_PRESENCE";
 
+    const normalizeStatut = (statut: string) => {
+        if (statut === "ENVOYEE") return "VALIDEE";
+        if (statut === "EN_COURS_VALIDATION") return "EN_ATTENTE";
+        return statut;
+    };
+
+    const computeStats = (items: DocumentDemande[]): DocumentStats => {
+        const computed: DocumentStats = { enAttente: 0, validees: 0, rejetees: 0 };
+        items.forEach((doc) => {
+            const normalized = normalizeStatut(doc.statut);
+            if (normalized === "EN_ATTENTE") computed.enAttente++;
+            else if (normalized === "VALIDEE") computed.validees++;
+            else if (normalized === "REJETEE") computed.rejetees++;
+        });
+        return computed;
+    };
+
     const getFilteredDocuments = () => {
         return documents.filter(d => {
             if (statutFilter === "Tous") return true;
-            return d.statut === statutFilter;
+            return normalizeStatut(d.statut) === statutFilter;
         });
     };
     const filteredDocuments = getFilteredDocuments();
@@ -265,7 +273,7 @@ export default function EtudiantDocumentsPage() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">En Attente</p>
@@ -273,15 +281,6 @@ export default function EtudiantDocumentsPage() {
                     </div>
                     <div className="w-10 h-10 rounded-full bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center text-orange-600 dark:text-orange-300">
                         <Clock size={20} />
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-gray-500 dark:text-slate-400 text-sm font-medium leading-tight">En cours</p>
-                        <h3 className="text-2xl font-bold text-blue-600 dark:text-blue-300 mt-1">{stats.enCoursValidation}</h3>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-300">
-                        <FileText size={20} />
                     </div>
                 </div>
                 <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between">
@@ -295,11 +294,11 @@ export default function EtudiantDocumentsPage() {
                 </div>
                 <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-100 dark:border-slate-700 shadow-sm flex items-center justify-between">
                     <div>
-                        <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">Envoyées</p>
-                        <h3 className="text-2xl font-bold text-gray-600 dark:text-slate-200 mt-1">{stats.envoyees}</h3>
+                        <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">Rejetées</p>
+                        <h3 className="text-2xl font-bold text-red-600 dark:text-red-300 mt-1">{stats.rejetees}</h3>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-700/60 flex items-center justify-center text-gray-600 dark:text-slate-200">
-                        <Send size={20} />
+                    <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-300">
+                        <XCircle size={20} />
                     </div>
                 </div>
             </div>
@@ -387,7 +386,7 @@ export default function EtudiantDocumentsPage() {
                                             {formatDate(doc.createdAt)}
                                         </td>
                                         <td className="p-4 flex items-center justify-end gap-2">
-                                            {doc.statut === 'VALIDEE' ? (
+                                            {(doc.statut === 'VALIDEE' || doc.statut === 'ENVOYEE') ? (
                                                 <button
                                                     onClick={() => handleDownloadPdf(doc.id, `${doc.typeDocument}_${doc.id}.pdf`)}
                                                     className="px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center gap-1 font-medium shadow-sm"
@@ -467,7 +466,7 @@ export default function EtudiantDocumentsPage() {
                                     </div>
 
                                     <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-slate-700">
-                                        {doc.statut === 'VALIDEE' && (
+                                        {(doc.statut === 'VALIDEE' || doc.statut === 'ENVOYEE') && (
                                             <button
                                                 onClick={() => handleDownloadPdf(doc.id, `${doc.typeDocument}_${doc.id}.pdf`)}
                                                 className="flex-1 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center justify-center gap-1 font-medium shadow-sm"

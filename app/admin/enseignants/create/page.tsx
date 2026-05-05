@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
@@ -20,8 +20,22 @@ export default function CreateEnseignantPage() {
         dateNaissance: "",
         adresse: "",
         specialite: "",
-        grade: ""
+        grade: "",
+        filiereId: ""
     });
+    const [filieres, setFilieres] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchFilieres = async () => {
+            try {
+                const data = await api.get("/api/admin/filieres");
+                setFilieres(data);
+            } catch (err) {
+                console.error("Erreur chargement filieres", err);
+            }
+        };
+        fetchFilieres();
+    }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -189,6 +203,23 @@ export default function CreateEnseignantPage() {
                                 className="w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm"
                                 placeholder="ex: Professeur, Maître de conférences..."
                             />
+                        </div>
+
+                        {/* Filière */}
+                        <div className="space-y-2">
+                            <label htmlFor="filiereId" className="text-sm font-bold text-[#333333] dark:text-slate-100">Filière</label>
+                            <select
+                                id="filiereId"
+                                name="filiereId"
+                                value={formData.filiereId}
+                                onChange={handleChange}
+                                className="w-full bg-[#f8f9fa] dark:bg-[#0a0a0a] border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-[#ffa000] focus:bg-white dark:bg-slate-800 transition-all text-sm"
+                            >
+                                <option value="">Choisir une filière...</option>
+                                {filieres.map(f => (
+                                    <option key={f.id} value={f.id}>{f.nom} ({f.code})</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 

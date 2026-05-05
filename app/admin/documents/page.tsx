@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, Plus, Trash2, CheckCircle, XCircle, Download, FileText, Check, X, Clock, Send, FileCheck, Filter } from "lucide-react";
+import { Search, Trash2, CheckCircle, XCircle, Download, FileText, Check, X, Clock, Filter } from "lucide-react";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 interface Utilisateur {
     id: number;
@@ -28,19 +29,21 @@ interface DocumentDemande {
     etudiantNom?: string;
     etudiantPrenom?: string;
     etudiantMatricule?: string;
+    nomEntrepriseStage?: string;
+    adresseEntreprise?: string;
+    nomEncadrant?: string;
 }
 
 interface DocumentStats {
     enAttente: number;
-    enCoursValidation: number;
     validees: number;
     rejetees: number;
-    envoyees: number;
 }
 
 export default function AdminDocumentsPage() {
     const [documents, setDocuments] = useState<DocumentDemande[]>([]);
-    const [stats, setStats] = useState<DocumentStats>({ enAttente: 0, enCoursValidation: 0, validees: 0, rejetees: 0, envoyees: 0 });
+    const [stats, setStats] = useState<DocumentStats>({ enAttente: 0, validees: 0, rejetees: 0 });
+    const [documentConfigs, setDocumentConfigs] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     
     // Filtres et Recherche
@@ -53,33 +56,45 @@ export default function AdminDocumentsPage() {
     const [validationAction, setValidationAction] = useState<"valider" | "rejeter">("valider");
     const [commentaire, setCommentaire] = useState("");
 
+    const { confirm } = useConfirm();
+
     const fetchDocuments = async () => {
         try {
-            const data = await api.get("/api/admin/documents");
+            const data = await api.get("/api/admin/documents?page=0&size=1000");
             if (Array.isArray(data)) {
                 setDocuments(data);
+                setStats(computeStats(data));
             } else if (data && Array.isArray(data.content)) {
                 setDocuments(data.content);
-            } else {
-                setDocuments([]);
+                setStats(computeStats(data.content));
             }
         } catch (error: any) {
             toast.error(error.message || "Erreur lors du chargement des documents.");
         }
     };
 
-    const fetchStats = async () => {
+    const fetchConfigs = async () => {
         try {
-            const data = await api.get("/api/admin/documents/stats");
-            if (data) setStats(data);
+            const data = await api.get("/api/admin/document-configs");
+            setDocumentConfigs(data);
         } catch (error: any) {
-            console.error("Erreur stats documents", error);
+            console.error("Erreur configs", error);
+        }
+    };
+
+    const handleToggleConfig = async (id: number) => {
+        try {
+            await api.patch(`/api/admin/document-configs/${id}/toggle`, {});
+            toast.success("Paramètre mis à jour");
+            fetchConfigs();
+        } catch (error: any) {
+            toast.error("Erreur lors de la mise à jour");
         }
     };
 
     const loadData = async () => {
         setIsLoading(true);
-        await Promise.all([fetchDocuments(), fetchStats()]);
+        await Promise.all([fetchDocuments(), fetchConfigs()]);
         setIsLoading(false);
     };
 
@@ -93,7 +108,13 @@ export default function AdminDocumentsPage() {
     }, []);
 
     const handleDelete = async (id: number) => {
-        if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette demande ?")) return;
+        const isConfirmed = await confirm({
+            title: "Supprimer le document",
+            message: "Voulez-vous vraiment supprimer cette demande de document ?",
+            confirmText: "Supprimer",
+            variant: "danger"
+        });
+        if (!isConfirmed) return;
         try {
             await api.delete(`/api/admin/documents/${id}`);
             toast.success("Demande supprimée!");
@@ -142,16 +163,28 @@ export default function AdminDocumentsPage() {
             a.download = filename;
             a.click();
             window.URL.revokeObjectURL(url);
-            
-            if (statut === 'VALIDEE') {
-                // Si la demande était VALIDEE, on l'envoie (passe à ENVOYEE)
-                await api.patch(`/api/admin/documents/${id}/envoyer`, {});
-                toast.success("Document envoyé à l'étudiant !");
-                loadData();
-            }
+
+            toast.success(statut === 'VALIDEE' ? "PDF généré avec succès." : "PDF téléchargé.");
         } catch (error: any) {
             toast.error(error.message || "Erreur lors du téléchargement du PDF");
         }
+    };
+
+    const normalizeStatut = (statut: string) => {
+        if (statut === "ENVOYEE") return "VALIDEE";
+        if (statut === "EN_COURS_VALIDATION") return "EN_ATTENTE";
+        return statut;
+    };
+
+    const computeStats = (items: DocumentDemande[]): DocumentStats => {
+        const computed: DocumentStats = { enAttente: 0, validees: 0, rejetees: 0 };
+        items.forEach((doc) => {
+            const normalized = normalizeStatut(doc.statut);
+            if (normalized === "EN_ATTENTE") computed.enAttente++;
+            else if (normalized === "VALIDEE") computed.validees++;
+            else if (normalized === "REJETEE") computed.rejetees++;
+        });
+        return computed;
     };
 
     const formatDate = (dateStr?: string) => {
@@ -173,13 +206,12 @@ export default function AdminDocumentsPage() {
     };
 
     const getStatutBadge = (statut: string) => {
-        switch (statut) {
+        const normalized = normalizeStatut(statut);
+        switch (normalized) {
             case 'EN_ATTENTE': return <span className="bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">EN ATTENTE</span>;
-            case 'EN_COURS_VALIDATION': return <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">EN COURS VALIDATION</span>;
             case 'VALIDEE': return <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">VALIDÉE</span>;
             case 'REJETEE': return <span className="bg-red-100 text-red-700 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">REJETÉE</span>;
-            case 'ENVOYEE': return <span className="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">ENVOYÉE</span>;
-            default: return <span className="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">{statut}</span>;
+            default: return <span className="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap">{normalized}</span>;
         }
     };
 
@@ -187,7 +219,7 @@ export default function AdminDocumentsPage() {
         const matchesSearch = 
             (`${d.etudiantNom || ''} ${d.etudiantPrenom || ''}`.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (d.etudiantMatricule?.toLowerCase().includes(searchTerm.toLowerCase()));
-        const matchesStatut = statutFilter === "Tous" || d.statut === statutFilter;
+        const matchesStatut = statutFilter === "Tous" || normalizeStatut(d.statut) === statutFilter;
         return matchesSearch && matchesStatut;
     });
 
@@ -196,7 +228,7 @@ export default function AdminDocumentsPage() {
             <h1 className="text-[#042954] dark:text-whitexl font-bold text-[#042954] dark:text-white">Demandes de Documents</h1>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 lg:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
                 <div className="bg-white dark:bg-[#111111] rounded-xl p-6 border border-gray-100 dark:border-zinc-800/50 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-gray-500 dark:text-zinc-400 text-sm font-medium">En Attente</p>
@@ -204,15 +236,6 @@ export default function AdminDocumentsPage() {
                     </div>
                     <div className="w-12 h-12 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center text-orange-600 dark:text-orange-400">
                         <Clock size={24} />
-                    </div>
-                </div>
-                <div className="bg-white dark:bg-[#111111] rounded-xl p-6 border border-gray-100 dark:border-zinc-800/50 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-gray-500 dark:text-zinc-400 text-sm font-medium leading-tight">En cours<br/>validation</p>
-                        <h3 className="text-xl font-bold text-blue-600 dark:text-blue-500 mt-1">{stats.enCoursValidation}</h3>
-                    </div>
-                    <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                        <FileText size={24} />
                     </div>
                 </div>
                 <div className="bg-white dark:bg-[#111111] rounded-xl p-6 border border-gray-100 dark:border-zinc-800/50 shadow-sm flex items-center justify-between">
@@ -233,14 +256,33 @@ export default function AdminDocumentsPage() {
                         <XCircle size={24} />
                     </div>
                 </div>
-                <div className="bg-white dark:bg-[#111111] rounded-xl p-6 border border-gray-100 dark:border-zinc-800/50 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-gray-500 dark:text-zinc-400 text-sm font-medium">Envoyées</p>
-                        <h3 className="text-xl font-bold text-gray-600 dark:text-zinc-300 mt-1">{stats.envoyees}</h3>
-                    </div>
-                    <div className="w-12 h-12 rounded-full bg-gray-50 dark:bg-zinc-800/50 flex items-center justify-center text-gray-600 dark:text-zinc-400">
-                        <Send size={24} />
-                    </div>
+            </div>
+
+            {/* Document Access Management */}
+            <div className="bg-white dark:bg-[#111111] rounded-xl border border-gray-100 dark:border-zinc-800/50 shadow-sm overflow-hidden mb-6">
+                <div className="p-4 border-b border-gray-100 dark:border-zinc-800/50 bg-gray-50/50 dark:bg-zinc-900/50">
+                    <h2 className="text-sm font-bold text-[#042954] dark:text-[#ffa000] uppercase tracking-wider">Gestion des Accès Étudiants</h2>
+                </div>
+                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {documentConfigs.map(config => (
+                        <div key={config.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-zinc-800 bg-gray-50/30 dark:bg-zinc-900/30">
+                            <div>
+                                <p className="text-sm font-bold text-gray-800 dark:text-zinc-200">{getTypeLabel(config.typeDocument)}</p>
+                            </div>
+                            <button
+                                onClick={() => handleToggleConfig(config.id)}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                                    config.enabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-zinc-700'
+                                }`}
+                            >
+                                <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                        config.enabled ? 'translate-x-6' : 'translate-x-1'
+                                    }`}
+                                />
+                            </button>
+                        </div>
+                    ))}
                 </div>
             </div>
 
@@ -258,10 +300,8 @@ export default function AdminDocumentsPage() {
                             >
                                 <option value="Tous">Tous les statuts</option>
                                 <option value="EN_ATTENTE">En Attente</option>
-                                <option value="EN_COURS_VALIDATION">En Cours Validation</option>
                                 <option value="VALIDEE">Validée</option>
                                 <option value="REJETEE">Rejetée</option>
-                                <option value="ENVOYEE">Envoyée</option>
                             </select>
                         </div>
                         <div className="relative w-full sm:w-auto">
@@ -364,20 +404,12 @@ export default function AdminDocumentsPage() {
                                                     </button>
                                                 </>
                                             )}
-                                            {doc.statut === 'VALIDEE' && (
+                                            {(doc.statut === 'VALIDEE' || doc.statut === 'ENVOYEE') && (
                                                 <button
                                                     onClick={() => handleDownloadPdf(doc.id, doc.statut, `document_${doc.id}.pdf`)}
                                                     className="px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center gap-1 font-medium shadow-sm"
                                                 >
                                                     <Download size={14} /> Générer PDF
-                                                </button>
-                                            )}
-                                            {doc.statut === 'ENVOYEE' && (
-                                                <button
-                                                    onClick={() => handleDownloadPdf(doc.id, doc.statut, `document_${doc.id}.pdf`)}
-                                                    className="px-3 py-1.5 text-sm text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-md transition-colors flex items-center gap-1 font-medium shadow-sm"
-                                                >
-                                                    <Download size={14} /> PDF
                                                 </button>
                                             )}
                                             <button
@@ -446,11 +478,8 @@ export default function AdminDocumentsPage() {
                                                 <button onClick={() => openValidationModal(doc, "rejeter")} className="flex-1 px-3 py-2 text-sm text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors flex items-center justify-center gap-1 font-medium shadow-sm"><X size={16} /> Rejeter</button>
                                             </div>
                                         )}
-                                        {doc.statut === 'VALIDEE' && (
+                                        {(doc.statut === 'VALIDEE' || doc.statut === 'ENVOYEE') && (
                                             <button onClick={() => handleDownloadPdf(doc.id, doc.statut, `document_${doc.id}.pdf`)} className="px-3 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center justify-center gap-1 font-medium shadow-sm mr-auto"><Download size={14} /> PDF</button>
-                                        )}
-                                        {doc.statut === 'ENVOYEE' && (
-                                            <button onClick={() => handleDownloadPdf(doc.id, doc.statut, `document_${doc.id}.pdf`)} className="px-3 py-2 text-sm text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-md transition-colors flex items-center justify-center gap-1 font-medium shadow-sm mr-auto"><Download size={14} /> PDF</button>
                                         )}
                                         <button onClick={() => handleDelete(doc.id)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded transition-colors" title="Supprimer"><Trash2 size={16} /></button>
                                     </div>
@@ -479,6 +508,32 @@ export default function AdminDocumentsPage() {
                                     {validationAction === "valider" ? "valider" : "rejeter"}
                                 </strong> la demande de type <strong>{getTypeLabel(currentDoc.typeDocument)}</strong> pour l'étudiant <strong>{currentDoc.etudiantNom} {currentDoc.etudiantPrenom}</strong> ?
                             </p>
+
+                            {(currentDoc.typeDocument === "DEMANDE_STAGE" || currentDoc.typeDocument === "VALIDATION_STAGE") && (
+                                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg space-y-2 text-sm border border-blue-100 dark:border-blue-800/30">
+                                    <h3 className="font-bold text-blue-800 dark:text-blue-300 mb-1 flex items-center gap-2">
+                                        Détails du Stage
+                                    </h3>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <span className="text-gray-500 dark:text-slate-400 block text-[10px] uppercase">Entreprise</span>
+                                            <span className="font-semibold text-gray-800 dark:text-slate-200">{currentDoc.nomEntrepriseStage || "-"}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-gray-500 dark:text-slate-400 block text-[10px] uppercase">Encadrant</span>
+                                            <span className="font-semibold text-gray-800 dark:text-slate-200">{currentDoc.nomEncadrant || "-"}</span>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <span className="text-gray-500 dark:text-slate-400 block text-[10px] uppercase">Adresse</span>
+                                            <span className="font-semibold text-gray-800 dark:text-slate-200">{currentDoc.adresseEntreprise || "-"}</span>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <span className="text-gray-500 dark:text-slate-400 block text-[10px] uppercase">Motif / Sujet</span>
+                                            <span className="font-semibold text-gray-800 dark:text-slate-200">{currentDoc.motif || "-"}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Commentaire (Optionnel)</label>
                                 <textarea 

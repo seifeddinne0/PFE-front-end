@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Trash2, CheckCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertTriangle, X, Save } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, API_URL } from "@/lib/api";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { Eye, Download, XCircle as XCircleIcon } from "lucide-react";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 interface Absence {
     id: number;
@@ -18,11 +20,16 @@ interface Absence {
     statut: string;
     motif: string;
     justification: string;
+    preuveJustification?: string;
     alerte: boolean;
+    filiereNom?: string;
+    niveauCode?: string;
+    classeCode?: string;
 }
 
 export default function AdminAbsencesPage() {
     const router = useRouter();
+    const { confirm } = useConfirm();
     const [absences, setAbsences] = useState<Absence[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filterStatut, setFilterStatut] = useState<string>("TOUS");
@@ -35,6 +42,17 @@ export default function AdminAbsencesPage() {
     const [justifyingAbsence, setJustifyingAbsence] = useState<Absence | null>(null);
     const [justification, setJustification] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Hierarchical Filters
+    const [filieres, setFilieres] = useState<any[]>([]);
+    const [niveaux, setNiveaux] = useState<any[]>([]);
+    const [classes, setClasses] = useState<any[]>([]);
+    const [matieres, setMatieres] = useState<any[]>([]);
+
+    const [selectedFiliere, setSelectedFiliere] = useState("");
+    const [selectedNiveau, setSelectedNiveau] = useState("");
+    const [selectedClasse, setSelectedClasse] = useState("");
+    const [selectedMatiere, setSelectedMatiere] = useState("");
 
     const fetchAbsences = async () => {
         setIsLoading(true);
@@ -55,6 +73,23 @@ export default function AdminAbsencesPage() {
         }
     };
 
+    const fetchMetadata = async () => {
+        try {
+            const [f, n, c, m] = await Promise.all([
+                api.get("/api/admin/filieres"),
+                api.get("/api/admin/niveaux"),
+                api.get("/api/admin/classes"),
+                api.get("/api/admin/matieres")
+            ]);
+            setFilieres(Array.isArray(f) ? f : []);
+            setNiveaux(Array.isArray(n) ? n : (n.content || []));
+            setClasses(Array.isArray(c) ? c : (c.content || []));
+            setMatieres(Array.isArray(m) ? m : (m.content || []));
+        } catch (error) {
+            console.error("Erreur chargement metadonnées", error);
+        }
+    };
+
     useEffect(() => {
         const token = sessionStorage.getItem("token");
         if (!token) {
@@ -62,10 +97,17 @@ export default function AdminAbsencesPage() {
             return;
         }
         fetchAbsences();
+        fetchMetadata();
     }, [router]);
 
     const handleDelete = async (id: number) => {
-        if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette absence ?")) return;
+        const isConfirmed = await confirm({
+            title: "Supprimer l'absence",
+            message: "Voulez-vous vraiment supprimer cette absence ?",
+            confirmText: "Supprimer",
+            variant: "danger"
+        });
+        if (!isConfirmed) return;
 
         try {
             await api.delete(`/api/admin/absences/${id}`);
@@ -76,20 +118,26 @@ export default function AdminAbsencesPage() {
         }
     };
 
+    const handleDecision = async (id: number, approved: boolean) => {
+        if (!window.confirm(approved ? "Accepter cette justification ?" : "Rejeter cette justification ?")) return;
+
+        try {
+            const endpoint = approved ? 'approve' : 'reject';
+            await api.patch(`/api/admin/absences/${id}/${endpoint}`, {});
+            toast.success(approved ? "Justification acceptée." : "Justification rejetée.");
+            await fetchAbsences();
+        } catch (error: any) {
+            toast.error(error.message || "Erreur lors de la mise à jour.");
+        }
+    };
+
     const handleJustifierSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!justifyingAbsence) return;
-
-        if (!justification.trim()) {
-            toast.error("La justification est requise.");
-            return;
-        }
+        if (!justification.trim() || !justifyingAbsence) return;
 
         setIsSubmitting(true);
         try {
-            await api.patch(`/api/admin/absences/${justifyingAbsence.id}/justifier`, {
-                justification: justification
-            });
+            await api.patch(`/api/admin/absences/${justifyingAbsence.id}/justifier`, { justification: justification });
             toast.success("Absence justifiée avec succès.");
             setJustifyingAbsence(null);
             setJustification("");
@@ -99,6 +147,12 @@ export default function AdminAbsencesPage() {
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const buildUploadUrl = (path?: string) => {
+        if (!path) return "#";
+        if (path.startsWith("http://") || path.startsWith("https://")) return path;
+        return `${API_URL}${path}`;
     };
 
     const getStatutBadge = (statut: string) => {
@@ -118,8 +172,13 @@ export default function AdminAbsencesPage() {
     };
 
     const filteredAbsences = absences.filter(abs => {
-        if (filterStatut === "TOUS") return true;
-        return abs.statut === filterStatut;
+        const matchesStatut = filterStatut === "TOUS" || abs.statut === filterStatut;
+        const matchesFiliere = !selectedFiliere || abs.filiereNom === selectedFiliere;
+        const matchesNiveau = !selectedNiveau || abs.niveauCode === selectedNiveau;
+        const matchesClasse = !selectedClasse || abs.classeCode === selectedClasse;
+        const matchesMatiere = !selectedMatiere || abs.matiereNom === selectedMatiere;
+        
+        return matchesStatut && matchesFiliere && matchesNiveau && matchesClasse && matchesMatiere;
     });
 
     const totalPages = Math.ceil(filteredAbsences.length / itemsPerPage);
@@ -139,12 +198,57 @@ export default function AdminAbsencesPage() {
                         <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Gestion et suivi des absences des étudiants</p>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-500 dark:text-slate-400">Filtrer par statut:</span>
+                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                        {/* Filière */}
+                        <select
+                            value={selectedFiliere}
+                            onChange={(e) => { setSelectedFiliere(e.target.value); setSelectedNiveau(""); setSelectedClasse(""); setCurrentPage(1); }}
+                            className="bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 text-gray-700 text-xs rounded-lg focus:ring-[#ffa000] p-2 outline-none min-w-[120px]"
+                        >
+                            <option value="">Toutes les Filières</option>
+                            {filieres.map(f => <option key={f.id} value={f.nom}>{f.nom}</option>)}
+                        </select>
+
+                        {/* Niveau */}
+                        <select
+                            value={selectedNiveau}
+                            onChange={(e) => { setSelectedNiveau(e.target.value); setSelectedClasse(""); setCurrentPage(1); }}
+                            className="bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 text-gray-700 text-xs rounded-lg focus:ring-[#ffa000] p-2 outline-none min-w-[100px]"
+                        >
+                            <option value="">Tous les Niveaux</option>
+                            {niveaux
+                                .filter(n => !selectedFiliere || n.filiereNom === selectedFiliere)
+                                .map(n => <option key={n.id} value={n.code}>{n.code}</option>)}
+                        </select>
+
+                        {/* Classe */}
+                        <select
+                            value={selectedClasse}
+                            onChange={(e) => { setSelectedClasse(e.target.value); setCurrentPage(1); }}
+                            className="bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 text-gray-700 text-xs rounded-lg focus:ring-[#ffa000] p-2 outline-none min-w-[100px]"
+                        >
+                            <option value="">Toutes les Classes</option>
+                            {classes
+                                .filter(c => !selectedNiveau || c.code.startsWith(selectedNiveau))
+                                .map(c => <option key={c.id} value={c.code}>{c.code}</option>)}
+                        </select>
+
+                        {/* Matière */}
+                        <select
+                            value={selectedMatiere}
+                            onChange={(e) => { setSelectedMatiere(e.target.value); setCurrentPage(1); }}
+                            className="bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 text-gray-700 text-xs rounded-lg focus:ring-[#ffa000] p-2 outline-none min-w-[120px]"
+                        >
+                            <option value="">Toutes les Matières</option>
+                            {matieres.map(m => <option key={m.id} value={m.nom}>{m.nom}</option>)}
+                        </select>
+
+                        <div className="h-8 w-[1px] bg-gray-200 dark:bg-slate-700 mx-1 hidden lg:block"></div>
+
                         <select
                             value={filterStatut}
                             onChange={(e) => { setFilterStatut(e.target.value); setCurrentPage(1); }}
-                            className="bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 text-gray-700 text-sm rounded-lg focus:ring-[#ffa000] focus:border-[#ffa000] block p-2 outline-none"
+                            className="bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 text-gray-700 text-xs rounded-lg font-bold focus:ring-[#ffa000] p-2 outline-none"
                         >
                             <option value="TOUS">Tous les statuts</option>
                             <option value="JUSTIFIEE">Justifiée</option>
@@ -197,36 +301,67 @@ export default function AdminAbsencesPage() {
                                                 {absence.statut.replace('_', ' ')}
                                             </span>
                                         </td>
-                                        <td className="p-4 text-sm text-gray-600 dark:text-slate-300 max-w-[200px]">
-                                            {absence.statut === "JUSTIFIEE" && absence.justification ? (
-                                                <div className="truncate" title={absence.justification}>
-                                                    <span className="font-medium text-green-700">Justification: </span>
-                                                    {absence.justification}
-                                                </div>
-                                            ) : (
-                                                <div className="truncate" title={absence.motif || "Aucun motif"}>{absence.motif || "-"}</div>
-                                            )}
+                                        <td className="p-4 text-sm max-w-[250px]">
+                                            <div className="flex flex-col gap-2">
+                                                {absence.justification && (
+                                                    <div className="text-gray-600 dark:text-slate-300 italic text-xs">
+                                                        &quot;{absence.justification}&quot;
+                                                    </div>
+                                                )}
+                                                {absence.preuveJustification ? (
+                                                    <a
+                                                        href={buildUploadUrl(absence.preuveJustification)}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 dark:text-blue-400 font-bold text-xs"
+                                                    >
+                                                        <Eye size={14} />
+                                                        Voir le justificatif
+                                                    </a>
+                                                ) : (
+                                                    <div className="text-gray-400 italic text-xs">{absence.motif || "Aucun motif"}</div>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="p-4 text-center">
                                             {absence.alerte && (
-                                                <div className="flex justify-center" title="Alerte dépassement de seuil d'absences">
+                                                <div className="flex flex-col items-center justify-center gap-1" title="Élimination: Plus de 3 absences non justifiées dans cette matière">
                                                     <AlertTriangle size={20} className="text-red-500" />
+                                                    <span className="text-[10px] font-bold text-red-600 dark:text-red-500 uppercase tracking-tighter">ÉLIMINÉ</span>
                                                 </div>
                                             )}
                                         </td>
                                         <td className="p-4 flex items-center justify-end gap-2">
-                                            {absence.statut !== "JUSTIFIEE" && (
+                                            {absence.statut === "EN_ATTENTE" && (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleDecision(absence.id, true)}
+                                                        className="p-2 text-green-600 bg-green-50 hover:bg-green-100 dark:text-green-400 dark:bg-green-900/20 dark:hover:bg-green-900/40 rounded transition-colors"
+                                                        title="Approuver"
+                                                    >
+                                                        <CheckCircle size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDecision(absence.id, false)}
+                                                        className="p-2 text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded transition-colors"
+                                                        title="Rejeter"
+                                                    >
+                                                        <XCircleIcon size={16} />
+                                                    </button>
+                                                </>
+                                            )}
+                                            {absence.statut === "NON_JUSTIFIEE" && (
                                                 <button
                                                     onClick={() => { setJustifyingAbsence(absence); setJustification(""); }}
-                                                    className="p-2 text-green-600 bg-green-50 hover:bg-green-100 dark:text-green-400 dark:bg-green-900/20 dark:hover:bg-green-900/40 rounded transition-colors cursor-pointer"
-                                                    title="Justifier l'absence"
+                                                    className="p-2 text-green-600 bg-green-50 hover:bg-green-100 dark:text-green-400 dark:bg-green-900/20 dark:hover:bg-green-900/40 rounded transition-colors"
+                                                    title="Justifier manuellement"
                                                 >
                                                     <CheckCircle size={16} />
                                                 </button>
                                             )}
                                             <button
                                                 onClick={() => handleDelete(absence.id)}
-                                                className="p-2 text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded transition-colors cursor-pointer"
+                                                className="p-2 text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded transition-colors"
                                                 title="Supprimer"
                                             >
                                                 <Trash2 size={16} />
@@ -276,23 +411,39 @@ export default function AdminAbsencesPage() {
                                         </div>
                                         <div>
                                             <span className="block text-gray-500 dark:text-slate-400 mb-1">Motif / Justification</span>
-                                            {absence.statut === "JUSTIFIEE" && absence.justification ? (
-                                                <div className="bg-green-50 text-green-800 p-2 rounded text-xs border border-green-100">
-                                                    {absence.justification}
-                                                </div>
-                                            ) : (
-                                                <div className="bg-gray-100 text-gray-600 dark:text-slate-300 p-2 rounded text-xs">
-                                                    {absence.motif || "Aucun motif"}
-                                                </div>
-                                            )}
+                                            <div className="space-y-2">
+                                                {absence.justification && (
+                                                    <div className="text-xs italic text-gray-600 dark:text-slate-400">&quot;{absence.justification}&quot;</div>
+                                                )}
+                                                {absence.preuveJustification ? (
+                                                    <a
+                                                        href={buildUploadUrl(absence.preuveJustification)}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="flex items-center gap-1.5 text-blue-600 font-bold text-xs"
+                                                    >
+                                                        <Eye size={14} /> Voir le justificatif
+                                                    </a>
+                                                ) : (
+                                                    <div className="bg-gray-100 dark:bg-slate-900 p-2 rounded text-[10px]">
+                                                        {absence.motif || "Aucun motif"}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
                                     <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-slate-700">
-                                        {absence.statut !== "JUSTIFIEE" && (
-                                            <button onClick={() => { setJustifyingAbsence(absence); setJustification(""); }} className="p-2 px-3 text-sm flex items-center gap-1 text-green-600 bg-green-50 hover:bg-green-100 dark:text-green-400 dark:bg-green-900/20 dark:hover:bg-green-900/40 rounded" title="Justifier l'absence"><CheckCircle size={16} /> Justifier</button>
+                                        {absence.statut === "EN_ATTENTE" && (
+                                            <>
+                                                <button onClick={() => handleDecision(absence.id, true)} className="flex-1 py-2 text-xs font-bold text-green-600 bg-green-50 rounded select-none">Accepter</button>
+                                                <button onClick={() => handleDecision(absence.id, false)} className="flex-1 py-2 text-xs font-bold text-red-600 bg-red-50 rounded select-none">Rejeter</button>
+                                            </>
                                         )}
-                                        <button onClick={() => handleDelete(absence.id)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded" title="Supprimer"><Trash2 size={16} /></button>
+                                        {absence.statut === "NON_JUSTIFIEE" && (
+                                            <button onClick={() => { setJustifyingAbsence(absence); setJustification(""); }} className="flex-1 py-2 text-xs font-bold text-green-600 bg-green-50 rounded select-none">Justifier manuellement</button>
+                                        )}
+                                        <button onClick={() => handleDelete(absence.id)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors"><Trash2 size={16} /></button>
                                     </div>
                                 </div>
                             ))

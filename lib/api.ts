@@ -129,6 +129,15 @@ export const api = {
             throw error;
         }
 
+        if (res.status === 204) {
+            return null;
+        }
+
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+            return null;
+        }
+
         return res.json();
     },
 

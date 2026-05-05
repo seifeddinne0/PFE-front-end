@@ -76,7 +76,7 @@ export default function LoginPage() {
                         <span className="text-3xl font-bold tracking-tight">Gestion<span className="font-light text-white/80">Ac</span></span>
                     </Link>
 
-                    <h1 className="text-[#042954] dark:text-whitexl lg:text-[#042954] dark:text-whitexl font-extrabold leading-tight mb-6">
+                    <h1 className="text-white text-4xl lg:text-5xl font-extrabold leading-tight mb-6">
                         Bienvenue dans votre <span className="text-[#ffa000]">espace numérique</span>
                     </h1>
                     <p className="text-lg text-white/80 max-w-md leading-relaxed mb-12">
@@ -116,7 +116,7 @@ export default function LoginPage() {
                     <div className="bg-[#ffa000] p-2 rounded shadow-sm">
                         <GraduationCap size={24} className="text-white" />
                     </div>
-                    <span className="text-[#042954] dark:text-whitexl font-bold tracking-tight text-[#042954] dark:text-white">Gestion<span className="font-light text-[#042954] dark:text-white/80">Ac</span></span>
+                    <span className="text-[#042954] dark:text-white font-bold tracking-tight text-xl">Gestion<span className="font-light opacity-80">Ac</span></span>
                 </div>
 
                 <div className="w-full max-w-md mx-auto">
@@ -191,7 +191,7 @@ export default function LoginPage() {
 
                     <div className="mt-10 pt-8 border-t border-gray-100 dark:border-slate-700 text-center">
                         <p className="text-sm text-gray-600 dark:text-slate-300">
-                            Besoin d&apos;aide ? <Link href="#" className="font-bold text-[#03a9f4] hover:underline">Contactez le secrétariat</Link>
+                            Besoin d&apos;aide ? <Link href="/aide" className="font-bold text-[#03a9f4] hover:underline">Page d&apos;aide</Link>
                         </p>
                     </div>
                 </div>

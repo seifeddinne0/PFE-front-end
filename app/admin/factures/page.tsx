@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Search, Plus, Edit2, Trash2, CheckCircle, XCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter, FileText, FileCheck, FileX, Download } from "lucide-react";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 interface Etudiant {
     id: number;
@@ -39,6 +40,7 @@ interface Facture {
     montant: number;
     datePaiement?: string;
     statut: string;
+    typePaiement?: string;
 }
 
 interface FactureStats {
@@ -49,6 +51,7 @@ interface FactureStats {
 }
 
 export default function AdminFacturesPage() {
+    const { confirm } = useConfirm();
     const [factures, setFactures] = useState<Facture[]>([]);
     const [etudiants, setEtudiants] = useState<Etudiant[]>([]);
     const [filieres, setFilieres] = useState<FiliereOption[]>([]);
@@ -58,6 +61,8 @@ export default function AdminFacturesPage() {
 
     const [searchTerm, setSearchTerm] = useState("");
     const [statutFilter, setStatutFilter] = useState("Tous");
+
+    const statutOptions = ["Tous", "PAYEE", "NON_PAYEE", "REJETEE"];
 
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -72,6 +77,7 @@ export default function AdminFacturesPage() {
         classeIds: [] as number[],
         montant: "",
         typeFacture: "SCOLARITE",
+        typePaiement: "UNE_TRANCHE",
         description: ""
     });
 
@@ -79,12 +85,13 @@ export default function AdminFacturesPage() {
         etudiantId: "",
         montant: "",
         typeFacture: "SCOLARITE",
+        typePaiement: "UNE_TRANCHE",
         description: ""
     });
 
     const fetchFactures = async () => {
         try {
-            const data = await api.get("/api/admin/factures");
+            const data = await api.get("/api/admin/factures?page=0&size=1000");
             if (Array.isArray(data)) {
                 setFactures(data);
             } else if (data && Array.isArray(data.content)) {
@@ -163,7 +170,13 @@ export default function AdminFacturesPage() {
     }, []);
 
     const handleDelete = async (id: number) => {
-        if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette facture ?")) return;
+        const isConfirmed = await confirm({
+            title: "Supprimer la facture",
+            message: "Voulez-vous vraiment supprimer cette facture ?",
+            confirmText: "Supprimer",
+            variant: "danger"
+        });
+        if (!isConfirmed) return;
         try {
             await api.delete(`/api/admin/factures/${id}`);
             toast.success("Facture supprimée!");
@@ -195,6 +208,17 @@ export default function AdminFacturesPage() {
         }
     };
 
+    const handleReject = async (id: number) => {
+        if (!window.confirm("Confirmer le rejet de cette facture ?")) return;
+        try {
+            await api.patch(`/api/admin/factures/${id}/rejeter`, {});
+            toast.success("Facture rejetée!");
+            loadData();
+        } catch (error: any) {
+            toast.error(error.message || "Erreur lors du rejet.");
+        }
+    };
+
     const handleSubmitCreate = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -218,6 +242,7 @@ export default function AdminFacturesPage() {
                 classeIds: batchFormData.classeIds,
                 montant: parseFloat(batchFormData.montant),
                 typeFacture: batchFormData.typeFacture,
+                typePaiement: batchFormData.typePaiement,
                 description: batchFormData.description
             };
 
@@ -230,6 +255,7 @@ export default function AdminFacturesPage() {
                 classeIds: [],
                 montant: "",
                 typeFacture: "SCOLARITE",
+                typePaiement: "UNE_TRANCHE",
                 description: ""
             });
             loadData();
@@ -246,6 +272,7 @@ export default function AdminFacturesPage() {
                 etudiantId: parseInt(formData.etudiantId),
                 montant: parseFloat(formData.montant),
                 typeFacture: formData.typeFacture,
+                typePaiement: formData.typePaiement,
                 description: formData.description
             };
             await api.put(`/api/admin/factures/${currentFacture.id}`, payload);
@@ -263,6 +290,7 @@ export default function AdminFacturesPage() {
             etudiantId: f.etudiantId ? f.etudiantId.toString() : "",
             montant: f.montant.toString(),
             typeFacture: f.typeFacture || "SCOLARITE",
+            typePaiement: f.typePaiement || "UNE_TRANCHE",
             description: f.description || ""
         });
         setIsEditModalOpen(true);
@@ -357,6 +385,7 @@ export default function AdminFacturesPage() {
             classeIds: [],
             montant: "",
             typeFacture: "SCOLARITE",
+            typePaiement: "UNE_TRANCHE",
             description: ""
         });
         setIsCreateModalOpen(true);
@@ -374,12 +403,17 @@ export default function AdminFacturesPage() {
 
     const getStatutBadge = (statut: string) => {
         switch (statut) {
-            case 'PAYEE': return <span className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2.5 py-1 rounded-full text-xs font-bold">PAYÉE</span>;
-            case 'NON_PAYEE': return <span className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-2.5 py-1 rounded-full text-xs font-bold">NON PAYÉE</span>;
-            case 'EN_ATTENTE': return <span className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-2.5 py-1 rounded-full text-xs font-bold">EN ATTENTE</span>;
-            case 'ANNULEE': return <span className="bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-zinc-400 px-2.5 py-1 rounded-full text-xs font-bold">ANNULÉE</span>;
-            default: return <span className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2.5 py-1 rounded-full text-xs font-bold">{statut}</span>;
+            case 'PAYEE': return <span className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 px-2.5 py-1 rounded-full text-xs font-bold">PAYÉE</span>;
+            case 'NON_PAYEE': return <span className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 px-2.5 py-1 rounded-full text-xs font-bold">NON PAYÉE</span>;
+            case 'REJETEE': return <span className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 px-2.5 py-1 rounded-full text-xs font-bold">REJETÉE</span>;
+            default: return <span className="bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-zinc-300 px-2.5 py-1 rounded-full text-xs font-bold">{statut}</span>;
         }
+    };
+
+    const formatTypePaiement = (typePaiement?: string) => {
+        if (typePaiement === "DEUX_TRANCHES") return "2 tranches";
+        if (typePaiement === "UNE_TRANCHE") return "1 tranche";
+        return "1 tranche";
     };
 
     const filteredFactures = factures.filter(f => {
@@ -452,8 +486,7 @@ export default function AdminFacturesPage() {
                                 <option value="Tous">Tous les statuts</option>
                                 <option value="PAYEE">Payée</option>
                                 <option value="NON_PAYEE">Non Payée</option>
-                                <option value="EN_ATTENTE">En Attente</option>
-                                <option value="ANNULEE">Annulée</option>
+                                <option value="REJETEE">Rejetée</option>
                             </select>
                         </div>
                         <div className="relative">
@@ -491,6 +524,7 @@ export default function AdminFacturesPage() {
                                 <th className="p-4 font-semibold">Étudiant</th>
                                 <th className="p-4 font-semibold">Matricule</th>
                                 <th className="p-4 font-semibold">Type</th>
+                                <th className="p-4 font-semibold">Paiement</th>
                                 <th className="p-4 font-semibold">Montant</th>
                                 <th className="p-4 font-semibold text-center">Statut</th>
                                 <th className="p-4 font-semibold">Date Paiement</th>
@@ -500,7 +534,7 @@ export default function AdminFacturesPage() {
                         <tbody>
                             {isLoading ? (
                                 <tr>
-                                    <td colSpan={8} className="p-8 text-center text-gray-500 dark:text-slate-400">
+                                    <td colSpan={9} className="p-8 text-center text-gray-500 dark:text-slate-400">
                                         <div className="flex justify-center items-center gap-2">
                                             <div className="w-5 h-5 border-2 border-[#042954] border-t-transparent rounded-full animate-spin"></div>
                                             Chargement en cours...
@@ -509,7 +543,7 @@ export default function AdminFacturesPage() {
                                 </tr>
                             ) : paginatedFactures.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="p-8 text-center text-gray-500 dark:text-slate-400">Aucune facture trouvée.</td>
+                                    <td colSpan={9} className="p-8 text-center text-gray-500 dark:text-slate-400">Aucune facture trouvée.</td>
                                 </tr>
                             ) : (
                                 paginatedFactures.map((facture) => (
@@ -534,49 +568,30 @@ export default function AdminFacturesPage() {
                                             </span>
                                         </td>
                                         <td className="p-4 text-sm text-gray-600 dark:text-zinc-300">{facture.typeFacture || "-"}</td>
+                                        <td className="p-4 text-sm text-gray-600 dark:text-zinc-300">{formatTypePaiement(facture.typePaiement)}</td>
                                         <td className="p-4 font-bold text-gray-800 dark:text-zinc-100">{formatMontant(facture.montant)}</td>
                                         <td className="p-4 text-center">{getStatutBadge(facture.statut)}</td>
                                         <td className="p-4 text-sm text-gray-600 dark:text-zinc-300">{formatDate(facture.datePaiement)}</td>
                                         <td className="p-4">
                                             <div className="flex items-center justify-end gap-2">
-                                                {(facture.statut === 'NON_PAYEE' || facture.statut === 'EN_ATTENTE') && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleMarkAsPaid(facture.id)}
-                                                            className="p-2 text-green-600 bg-green-50 hover:bg-green-100 dark:text-green-400 dark:bg-green-900/20 dark:hover:bg-green-900/40 rounded transition-colors"
-                                                            title="Marquer Payée"
-                                                        >
-                                                            <CheckCircle size={16} />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleCancel(facture.id)}
-                                                            className="p-2 text-gray-600 dark:text-zinc-400 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800/80 dark:hover:bg-zinc-700/80 rounded transition-colors"
-                                                            title="Annuler"
-                                                        >
-                                                            <XCircle size={16} />
-                                                        </button>
-                                                    </>
+                                                {facture.statut === 'NON_PAYEE' && (
+                                                    <button onClick={() => handleMarkAsPaid(facture.id)} className="text-green-600 hover:text-green-800" title="Marquer comme payée">
+                                                        <CheckCircle size={18} />
+                                                    </button>
                                                 )}
-                                                <button
-                                                    onClick={() => handleExportPdfStudent(facture.etudiantId, facture.etudiantMatricule)}
-                                                    className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:text-indigo-400 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 rounded transition-colors"
-                                                    title="PDF Étudiant"
-                                                >
-                                                    <Download size={16} />
+                                                {(facture.statut === 'NON_PAYEE' || facture.statut === 'PAYEE') && (
+                                                    <button onClick={() => handleReject(facture.id)} className="text-red-600 hover:text-red-800" title="Rejeter la facture">
+                                                        <XCircle size={18} />
+                                                    </button>
+                                                )}
+                                                <button onClick={() => openEditModal(facture)} className="text-blue-600 hover:text-blue-800" title="Modifier">
+                                                    <Edit2 size={18} />
                                                 </button>
-                                                <button
-                                                    onClick={() => openEditModal(facture)}
-                                                    className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded transition-colors"
-                                                    title="Modifier"
-                                                >
-                                                    <Edit2 size={16} />
+                                                <button onClick={() => handleDelete(facture.id)} className="text-gray-500 hover:text-gray-700" title="Supprimer">
+                                                    <Trash2 size={18} />
                                                 </button>
-                                                <button
-                                                    onClick={() => handleDelete(facture.id)}
-                                                    className="p-2 text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded transition-colors"
-                                                    title="Supprimer"
-                                                >
-                                                    <Trash2 size={16} />
+                                                <button onClick={() => handleExportPdfStudent(facture.etudiantId, facture.etudiantMatricule)} className="text-purple-600 hover:text-purple-800" title="Exporter PDF de l'étudiant">
+                                                    <Download size={18} />
                                                 </button>
                                             </div>
                                         </td>
@@ -622,6 +637,10 @@ export default function AdminFacturesPage() {
                                             <span className="font-medium text-gray-700">{facture.typeFacture || "-"}</span>
                                         </div>
                                         <div className="flex justify-between items-center py-1 border-b border-gray-200 dark:border-slate-700">
+                                            <span className="text-gray-500 dark:text-slate-400">Paiement</span>
+                                            <span className="font-medium text-gray-700">{formatTypePaiement(facture.typePaiement)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center py-1 border-b border-gray-200 dark:border-slate-700">
                                             <span className="text-gray-500 dark:text-slate-400">Montant</span>
                                             <span className="font-bold text-orange-600 text-base">{formatMontant(facture.montant)}</span>
                                         </div>
@@ -632,12 +651,8 @@ export default function AdminFacturesPage() {
                                     </div>
 
                                     <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-gray-100 dark:border-slate-700">
-                                        {(facture.statut === 'NON_PAYEE' || facture.statut === 'EN_ATTENTE') && (
-                                            <>
-                                                <button onClick={() => handleMarkAsPaid(facture.id)} className="p-2 text-green-600 bg-green-50 hover:bg-green-100 rounded" title="Marquer Payée"><CheckCircle size={16} /></button>
-                                                <button onClick={() => handleCancel(facture.id)} className="p-2 text-gray-600 dark:text-slate-300 bg-gray-100 hover:bg-gray-200 rounded" title="Annuler"><XCircle size={16} /></button>
-                                            </>
-                                        )}
+                                        <button onClick={() => handleMarkAsPaid(facture.id)} className="p-2 text-green-600 bg-green-50 hover:bg-green-100 rounded" title="Marquer Payée"><CheckCircle size={16} /></button>
+                                        <button onClick={() => handleCancel(facture.id)} className="p-2 text-gray-600 dark:text-slate-300 bg-gray-100 hover:bg-gray-200 rounded" title="Annuler"><XCircle size={16} /></button>
                                         <button onClick={() => handleExportPdfStudent(facture.etudiantId, facture.etudiantMatricule)} className="mr-auto px-3 py-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center gap-1 font-medium shadow-sm"><Download size={12} /> PDF</button>
                                         <button onClick={() => openEditModal(facture)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded" title="Modifier"><Edit2 size={16} /></button>
                                         <button onClick={() => handleDelete(facture.id)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded" title="Supprimer"><Trash2 size={16} /></button>
@@ -812,7 +827,7 @@ export default function AdminFacturesPage() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Montant *</label>
                                     <input
@@ -835,6 +850,18 @@ export default function AdminFacturesPage() {
                                         <option value="INSCRIPTION">Inscription</option>
                                         <option value="BIBLIOTHEQUE">Bibliothèque</option>
                                         <option value="AUTRE">Autre</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Paiement *</label>
+                                    <select
+                                        required
+                                        className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
+                                        value={batchFormData.typePaiement}
+                                        onChange={e => setBatchFormData({ ...batchFormData, typePaiement: e.target.value })}
+                                    >
+                                        <option value="UNE_TRANCHE">1 tranche</option>
+                                        <option value="DEUX_TRANCHES">2 tranches</option>
                                     </select>
                                 </div>
                             </div>
@@ -874,11 +901,12 @@ export default function AdminFacturesPage() {
                                     {currentFacture.etudiantNom} {currentFacture.etudiantPrenom} — {currentFacture.etudiantMatricule}
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Montant *</label>
                                     <input
                                         type="number" step="0.01" min="0" required
+                                        placeholder="0.00"
                                         className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
                                         value={formData.montant}
                                         onChange={e => setFormData({ ...formData, montant: e.target.value })}
@@ -896,6 +924,18 @@ export default function AdminFacturesPage() {
                                         <option value="INSCRIPTION">Inscription</option>
                                         <option value="BIBLIOTHEQUE">Bibliothèque</option>
                                         <option value="AUTRE">Autre</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Paiement *</label>
+                                    <select
+                                        required
+                                        className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-[#ffa000] focus:border-[#ffa000]"
+                                        value={formData.typePaiement}
+                                        onChange={e => setFormData({ ...formData, typePaiement: e.target.value })}
+                                    >
+                                        <option value="UNE_TRANCHE">1 tranche</option>
+                                        <option value="DEUX_TRANCHES">2 tranches</option>
                                     </select>
                                 </div>
                             </div>

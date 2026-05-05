@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { AlertTriangle, Clock, CalendarDays, CheckCircle, XCircle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, API_URL } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { X, FileCheck, File } from "lucide-react";
 
 interface Absence {
     id: number;
@@ -17,6 +18,7 @@ interface Absence {
     statut: string;
     motif: string;
     justification: string;
+    preuveJustification?: string;
     alerte: boolean;
 }
 
@@ -28,9 +30,12 @@ export default function EtudiantAbsencesPage() {
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
-    const [commentaires, setCommentaires] = useState<Record<number, string>>({});
-    const [filesByAbsence, setFilesByAbsence] = useState<Record<number, File | null>>({});
-    const [uploadingId, setUploadingId] = useState<number | null>(null);
+    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [selectedAbsence, setSelectedAbsence] = useState<Absence | null>(null);
+    const [justifFile, setJustifFile] = useState<File | null>(null);
+    const [justifPreviewUrl, setJustifPreviewUrl] = useState<string | null>(null);
+    const [commentaire, setCommentaire] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         const fetchAbsences = async () => {
@@ -90,43 +95,53 @@ export default function EtudiantAbsencesPage() {
         currentPage * itemsPerPage
     );
 
-    const handleFileChange = (absenceId: number, file: File | null) => {
-        setFilesByAbsence(prev => ({ ...prev, [absenceId]: file }));
+    const handleFileChange = (file: File | null) => {
+        if (justifPreviewUrl) {
+            URL.revokeObjectURL(justifPreviewUrl);
+        }
+        setJustifFile(file);
+        if (file && file.type.startsWith("image/")) {
+            setJustifPreviewUrl(URL.createObjectURL(file));
+        } else {
+            setJustifPreviewUrl(null);
+        }
     };
 
-    const handleCommentChange = (absenceId: number, commentaire: string) => {
-        setCommentaires(prev => ({ ...prev, [absenceId]: commentaire }));
+    const openUploadModal = (absence: Absence) => {
+        setSelectedAbsence(absence);
+        setIsUploadModalOpen(true);
+        setJustifFile(null);
+        setJustifPreviewUrl(null);
+        setCommentaire("");
     };
 
-    const handleSubmitJustification = async (absenceId: number) => {
-        const file = filesByAbsence[absenceId];
-        if (!file) {
-            toast.error("Veuillez choisir une image de justification.");
+    const handleSubmitJustification = async () => {
+        if (!selectedAbsence || !justifFile) {
+            toast.error("Veuillez choisir un fichier de justification.");
             return;
         }
 
         const formData = new FormData();
-        formData.append("image", file);
-        formData.append("commentaire", commentaires[absenceId] || "");
+        formData.append("file", justifFile);
+        formData.append("commentaire", commentaire);
 
-        setUploadingId(absenceId);
+        setIsSubmitting(true);
         try {
-            await api.postFormData(`/api/etudiant/absences/${absenceId}/demande-justification`, formData);
-            toast.success("Demande de justification envoyee.");
-
+            await api.postFormData(`/api/etudiant/absences/${selectedAbsence.id}/demande-justification`, formData);
+            toast.success("Demande de justification envoyée.");
+            setIsUploadModalOpen(false);
+            
+            // Reload absences
             const data = await api.get("/api/etudiant/absences");
             if (data && Array.isArray(data.content)) {
                 setAbsences(data.content);
             } else if (Array.isArray(data)) {
                 setAbsences(data);
             }
-
-            setFilesByAbsence(prev => ({ ...prev, [absenceId]: null }));
-            setCommentaires(prev => ({ ...prev, [absenceId]: "" }));
-        } catch {
-            toast.error("Erreur lors de l'envoi de la justification.");
+        } catch (error: any) {
+            toast.error(error.message || "Erreur lors de l'envoi de la justification.");
         } finally {
-            setUploadingId(null);
+            setIsSubmitting(false);
         }
     };
 
@@ -251,35 +266,24 @@ export default function EtudiantAbsencesPage() {
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="p-4 min-w-[290px]">
+                                        <td className="p-4 text-center">
                                             {absence.statut === "JUSTIFIEE" ? (
-                                                <span className="text-green-700 text-sm font-semibold">Justification acceptee</span>
-                                            ) : absence.statut === "EN_ATTENTE" ? (
-                                                <span className="text-amber-700 text-sm font-semibold">Demande en attente</span>
-                                            ) : (
-                                                <div className="space-y-2">
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*"
-                                                        onChange={(e) => handleFileChange(absence.id, e.target.files?.[0] || null)}
-                                                        className="block w-full text-xs text-gray-600 dark:text-slate-300 file:mr-3 file:py-1.5 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 dark:file:bg-blue-900/30 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/50"
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        value={commentaires[absence.id] || ""}
-                                                        onChange={(e) => handleCommentChange(absence.id, e.target.value)}
-                                                        placeholder="Commentaire (optionnel)"
-                                                        className="w-full border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 rounded px-2 py-1.5 text-xs"
-                                                    />
-                                                    <button
-                                                        onClick={() => handleSubmitJustification(absence.id)}
-                                                        disabled={uploadingId === absence.id}
-                                                        className="inline-flex items-center gap-1.5 bg-[#03a9f4] hover:bg-[#0288d1] disabled:opacity-50 text-white text-xs font-bold px-3 py-1.5 rounded"
-                                                    >
-                                                        <Upload size={12} />
-                                                        {uploadingId === absence.id ? "Envoi..." : "Demander"}
-                                                    </button>
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <span className="text-green-600 dark:text-green-400 text-xs font-bold">VALIDE</span>
+                                                    {absence.justification && <span className="text-[10px] text-gray-500 truncate max-w-[120px]">{absence.justification}</span>}
                                                 </div>
+                                            ) : absence.statut === "EN_ATTENTE" ? (
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <span className="text-amber-600 dark:text-amber-400 text-xs font-bold italic underline">Vérification en cours</span>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => openUploadModal(absence)}
+                                                    className="inline-flex items-center gap-1.5 bg-[#042954] hover:bg-[#031f40] dark:bg-blue-600 dark:hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-sm"
+                                                >
+                                                    <Upload size={14} />
+                                                    Justifier
+                                                </button>
                                             )}
                                         </td>
                                     </tr>
@@ -318,35 +322,23 @@ export default function EtudiantAbsencesPage() {
                                         {absence.matiereNom || "-"}
                                     </h3>
 
-                                    <div className="mt-3 bg-gray-50 dark:bg-slate-900/60 p-3 rounded-lg border border-gray-100 dark:border-slate-700">
+                                    <div className="mt-3">
                                         {absence.statut === "JUSTIFIEE" ? (
-                                            <span className="text-sm text-green-700 font-semibold">Justification acceptee</span>
-                                        ) : absence.statut === "EN_ATTENTE" ? (
-                                            <span className="text-sm text-amber-700 font-semibold">Demande en attente</span>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    onChange={(e) => handleFileChange(absence.id, e.target.files?.[0] || null)}
-                                                    className="block w-full text-xs text-gray-600 dark:text-slate-300 file:mr-3 file:py-1.5 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 dark:file:bg-blue-900/30 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/50"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={commentaires[absence.id] || ""}
-                                                    onChange={(e) => handleCommentChange(absence.id, e.target.value)}
-                                                    placeholder="Commentaire (optionnel)"
-                                                    className="w-full border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 rounded px-2 py-1.5 text-xs"
-                                                />
-                                                <button
-                                                    onClick={() => handleSubmitJustification(absence.id)}
-                                                    disabled={uploadingId === absence.id}
-                                                    className="inline-flex items-center gap-1.5 bg-[#03a9f4] hover:bg-[#0288d1] disabled:opacity-50 text-white text-xs font-bold px-3 py-1.5 rounded"
-                                                >
-                                                    <Upload size={12} />
-                                                    {uploadingId === absence.id ? "Envoi..." : "Demander"}
-                                                </button>
+                                            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-100 dark:border-green-800 text-center">
+                                                <span className="text-sm text-green-700 dark:text-green-300 font-bold">Justification acceptée</span>
                                             </div>
+                                        ) : absence.statut === "EN_ATTENTE" ? (
+                                            <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800 text-center">
+                                                <span className="text-sm text-amber-700 dark:text-amber-300 font-bold italic">Vérification en cours...</span>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => openUploadModal(absence)}
+                                                className="w-full inline-flex items-center justify-center gap-2 bg-[#042954] hover:bg-[#031f40] dark:bg-blue-600 dark:hover:bg-blue-500 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm"
+                                            >
+                                                <Upload size={16} />
+                                                Justifier cette absence
+                                            </button>
                                         )}
                                     </div>
                                 </div>
@@ -406,6 +398,116 @@ export default function EtudiantAbsencesPage() {
                     </div>
                 )}
             </div>
+
+            {/* ─── Upload Modal ─── */}
+            {isUploadModalOpen && selectedAbsence && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in duration-200">
+                        <div className="p-5 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center bg-gray-50/50 dark:bg-slate-800/50">
+                            <div>
+                                <h2 className="text-lg font-bold text-[#042954] dark:text-white">Justifier l&apos;absence</h2>
+                                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{selectedAbsence.matiereNom} — {formatDate(selectedAbsence.dateAbsence)}</p>
+                            </div>
+                            <button onClick={() => setIsUploadModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-6">
+                            {/* File Upload Dropzone */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-700 dark:text-slate-200 ml-1">Document de justification (Image ou PDF)</label>
+                                <div
+                                    className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 ${
+                                        justifFile 
+                                        ? 'border-green-300 bg-green-50/30 dark:border-green-800 dark:bg-green-900/10' 
+                                        : 'border-gray-200 hover:border-[#03a9f4] bg-gray-50/50 dark:border-slate-700 dark:hover:border-blue-500 dark:bg-slate-900/50'
+                                    }`}
+                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-[#03a9f4]', 'bg-blue-50/50'); }}
+                                    onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-[#03a9f4]', 'bg-blue-50/50'); }}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        e.currentTarget.classList.remove('border-[#03a9f4]', 'bg-blue-50/50');
+                                        const file = e.dataTransfer.files?.[0] || null;
+                                        handleFileChange(file);
+                                    }}
+                                >
+                                    <input
+                                        id="justif-upload"
+                                        type="file"
+                                        accept=".jpg,.jpeg,.png,.pdf"
+                                        className="hidden"
+                                        onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
+                                    />
+                                    
+                                    {!justifFile ? (
+                                        <label htmlFor="justif-upload" className="cursor-pointer flex flex-col items-center gap-3">
+                                            <div className="w-14 h-14 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-[#03a9f4]">
+                                                <Upload size={28} />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-700 dark:text-slate-200 leading-tight">Cliquez ou déposez votre fichier ici</p>
+                                                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Formats acceptés : JPG, PNG, PDF (max 5MB)</p>
+                                            </div>
+                                        </label>
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-3 animate-in fade-in duration-300">
+                                            <div className="w-14 h-14 bg-green-50 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600">
+                                                {justifFile.type === "application/pdf" ? <File size={28} /> : <FileCheck size={28} />}
+                                            </div>
+                                            <div className="max-w-xs">
+                                                <p className="font-bold text-gray-800 dark:text-slate-100 truncate">{justifFile.name}</p>
+                                                <p className="text-xs text-gray-500 dark:text-slate-400">{(justifFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleFileChange(null)}
+                                                className="text-xs font-bold text-red-500 hover:underline mt-1"
+                                            >
+                                                Supprimer et changer
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Preview for images */}
+                            {justifPreviewUrl && (
+                                <div className="rounded-xl border border-gray-100 dark:border-slate-700 overflow-hidden shadow-inner max-h-48 flex justify-center bg-gray-50 dark:bg-slate-900">
+                                    <img src={justifPreviewUrl} alt="Aperçu" className="max-w-full object-contain" />
+                                </div>
+                            )}
+
+                            {/* Comment field */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-700 dark:text-slate-200 ml-1">Commentaire ou motif (optionnel)</label>
+                                <textarea
+                                    value={commentaire}
+                                    onChange={(e) => setCommentaire(e.target.value)}
+                                    placeholder="Expliquez brièvement la raison de votre absence..."
+                                    className="w-full bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#03a9f4] outline-none transition-all placeholder:text-gray-400 min-h-[100px] resize-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="p-6 bg-gray-50/50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-700 flex justify-end gap-3">
+                            <button 
+                                onClick={() => setIsUploadModalOpen(false)}
+                                className="px-6 py-2.5 font-bold text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-xl transition-colors"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={handleSubmitJustification}
+                                disabled={isSubmitting || !justifFile}
+                                className="px-8 py-2.5 bg-[#03a9f4] hover:bg-[#0288d1] disabled:opacity-50 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-[#03a9f4]/20 flex items-center gap-2"
+                            >
+                                {isSubmitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                                {isSubmitting ? "Envoi en cours..." : "Envoyer la justification"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

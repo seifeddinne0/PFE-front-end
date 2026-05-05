@@ -168,7 +168,7 @@ export default function EtudiantDashboardPage() {
                     {role !== "ROLE_ADMIN" && (
                         <div className="flex-shrink-0">
                             <Link 
-                                href="/dashboard/profile"
+                                href="/etudiant/profile"
                                 className="group relative inline-flex items-center justify-center bg-[#ffa000] text-[#042954] dark:text-white font-black py-4 px-8 rounded-xl transition-all shadow-xl hover:shadow-[#ffa000]/30 hover:scale-105 overflow-hidden"
                             >
                                 <span className="relative z-10">Mon Profil</span>

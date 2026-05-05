@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { LogOut, User, BookOpen, Settings, Bell, LayoutDashboard, FileText, Users, Calendar, UserX, CreditCard, Files, Menu, X } from "lucide-react";
+import { LogOut, User, BookOpen, Settings, Bell, LayoutDashboard, FileText, Users, Calendar, UserX, CreditCard, Files, Menu, X, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { Toaster } from 'react-hot-toast';
 import { api } from "@/lib/api";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import NotificationBell from "@/app/components/NotificationBell";
 
 export default function EnseignantLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -106,6 +107,7 @@ export default function EnseignantLayout({ children }: { children: React.ReactNo
         { name: "Absences", href: role ? `/${role.replace("ROLE_", "").toLowerCase()}/absences` : "/absences", icon: UserX, exact: false },
         ...(role === "ROLE_ETUDIANT" ? [{ name: "Factures", href: `/${role.replace("ROLE_", "").toLowerCase()}/factures`, icon: CreditCard, exact: false }] : []),
         { name: "Documents", href: role ? `/${role.replace("ROLE_", "").toLowerCase()}/documents` : "/documents", icon: Files, exact: false },
+        { name: "Chat", href: "/enseignant/chat", icon: MessageSquare, exact: false },
     ];
 
     const navLinks = role === "ROLE_ADMIN" ? adminLinks : defaultLinks;
@@ -200,7 +202,7 @@ export default function EnseignantLayout({ children }: { children: React.ReactNo
             {/* Main Content */}
             <main className="flex-1 flex flex-col h-screen overflow-hidden w-full">
                 {/* Header */}
-                <header className="bg-white dark:bg-slate-800 shadow-sm px-4 md:px-8 py-4 flex items-center justify-between z-10">
+                <header className="bg-white dark:bg-slate-800 shadow-sm px-4 md:px-8 py-4 flex items-center justify-between z-50">
                     <div className="flex items-center gap-3 md:gap-4">
                         <button 
                             className="md:hidden p-2 -ml-2 text-gray-600 dark:text-slate-300 hover:text-[#042954] dark:text-white transition-colors"
@@ -214,8 +216,9 @@ export default function EnseignantLayout({ children }: { children: React.ReactNo
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 relative z-20">
                         <ThemeToggle />
+                        <NotificationBell />
                          {role === "ROLE_ADMIN" ? (
                              <div className="flex items-center gap-3 border-l pl-4">
                                 <div className="hidden sm:block text-right">

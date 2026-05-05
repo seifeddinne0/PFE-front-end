@@ -5,6 +5,7 @@ import { Search, Plus, Edit2, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, C
 import Link from "next/link";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
+import { useConfirm } from "@/components/ConfirmProvider";
 
 interface Etudiant {
     id: number;
@@ -23,6 +24,7 @@ export default function EtudiantsListPage() {
     const [etudiants, setEtudiants] = useState<Etudiant[]>([]);
     const [classes, setClasses] = useState<any[]>([]);
     const [filieres, setFilieres] = useState<any[]>([]);
+    const { confirm } = useConfirm();
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -64,7 +66,13 @@ export default function EtudiantsListPage() {
     }, []);
 
     const handleDelete = async (id: number) => {
-        if (!window.confirm("Êtes-vous sûr de vouloir supprimer cet étudiant ?")) return;
+        const isConfirmed = await confirm({
+            title: "Supprimer l'étudiant",
+            message: "Êtes-vous sûr de vouloir supprimer cet étudiant ?",
+            confirmText: "Supprimer",
+            variant: "danger"
+        });
+        if (!isConfirmed) return;
 
         try {
             await api.delete(`/api/admin/etudiants/${id}`);
@@ -122,6 +130,45 @@ export default function EtudiantsListPage() {
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
+
+    const getPaginationNumbers = () => {
+        const pageNumbers = [];
+        const maxPagesToShow = 5;
+        const halfMaxPages = Math.floor(maxPagesToShow / 2);
+        
+        if (totalPages <= maxPagesToShow) {
+            for (let i = 1; i <= totalPages; i++) {
+                pageNumbers.push(i);
+            }
+        } else {
+            pageNumbers.push(1);
+            if (currentPage > halfMaxPages + 1) {
+                pageNumbers.push('...');
+            }
+            
+            let start = Math.max(2, currentPage - halfMaxPages);
+            let end = Math.min(totalPages - 1, currentPage + halfMaxPages);
+
+            if (currentPage <= halfMaxPages) {
+                end = maxPagesToShow -1;
+            }
+
+            if (currentPage > totalPages - halfMaxPages) {
+                start = totalPages - maxPagesToShow + 2;
+            }
+
+            for (let i = start; i <= end; i++) {
+                pageNumbers.push(i);
+            }
+
+            if (currentPage < totalPages - halfMaxPages) {
+                pageNumbers.push('...');
+            }
+            pageNumbers.push(totalPages);
+        }
+        return pageNumbers;
+    };
+
     const handleExportPdf = () => {
         const token = sessionStorage.getItem("token");
         fetch("http://localhost:8080/api/admin/etudiants/export/pdf", {
@@ -415,17 +462,21 @@ export default function EtudiantsListPage() {
                             <ChevronLeft size={18} />
                         </button>
 
-                        {Array.from({ length: totalPages }).map((_, i) => (
-                            <button
-                                key={i}
-                                onClick={() => setCurrentPage(i + 1)}
-                                className={`w-8 h-8 rounded border transition-colors font-medium flex items-center justify-center ${currentPage === i + 1
-                                    ? 'bg-[#042954] text-white border-[#042954] dark:bg-[#ffa000] dark:border-[#ffa000] dark:text-[#111111]'
-                                    : 'border-gray-300 text-gray-500 hover:bg-gray-50 dark:border-zinc-700 dark:bg-[#111111] dark:text-zinc-400 dark:hover:bg-[#1a1a1a]'
-                                    }`}
-                            >
-                                {i + 1}
-                            </button>
+                        {getPaginationNumbers().map((page, i) => (
+                            typeof page === 'number' ? (
+                                <button
+                                    key={i}
+                                    onClick={() => setCurrentPage(page)}
+                                    className={`w-8 h-8 rounded border transition-colors font-medium flex items-center justify-center ${currentPage === page
+                                        ? 'bg-[#042954] text-white border-[#042954] dark:bg-[#ffa000] dark:border-[#ffa0a0] dark:text-[#111111]'
+                                        : 'border-gray-300 text-gray-500 hover:bg-gray-50 dark:border-zinc-700 dark:bg-[#111111] dark:text-zinc-400 dark:hover:bg-[#1a1a1a]'
+                                        }`}
+                                >
+                                    {page}
+                                </button>
+                            ) : (
+                                <span key={i} className="w-8 h-8 flex items-center justify-center text-gray-500">...</span>
+                            )
                         ))}
 
                         <button

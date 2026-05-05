@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Toaster } from 'react-hot-toast';
 import { api } from "@/lib/api";
 import ThemeToggle from "@/app/components/ThemeToggle";
+import NotificationBell from "@/app/components/NotificationBell";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -147,7 +148,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {/* Main Content */}
             <main className="flex-1 flex flex-col h-screen overflow-hidden w-full">
                 {/* Header */}
-                <header className="bg-white dark:bg-[#111111] shadow-sm dark:shadow-none dark:border-b dark:border-zinc-800/50 px-4 md:px-8 py-4 flex items-center justify-between z-10 transition-colors">
+                <header className="bg-white dark:bg-[#111111] shadow-sm dark:shadow-none dark:border-b dark:border-zinc-800/50 px-4 md:px-8 py-4 flex items-center justify-between z-50 transition-colors">
                     <div className="flex items-center gap-3 md:gap-4">
                         <button 
                             className="md:hidden p-2 -ml-2 text-gray-600 dark:text-zinc-400 hover:text-[#042954] dark:hover:text-white transition-colors"
@@ -161,8 +162,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 relative z-20">
                         <ThemeToggle />
+                        <NotificationBell />
                          <div className="flex items-center gap-3 border-l pl-4 border-gray-200 dark:border-zinc-800/50">
                             <div className="hidden sm:block text-right">
                                 <p className="text-sm font-bold text-[#333333] dark:text-zinc-100">{userName}</p>
