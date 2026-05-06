@@ -24,6 +24,14 @@ interface Msg {
   deleted?: boolean; edited?: boolean;
 }
 interface ChatMsg { role: "user" | "bot"; text: string; time: string }
+interface SeanceItem {
+  jourSemaine?: string;
+  heureDebut?: string;
+  heureFin?: string;
+  matiereNom?: string;
+  semestre?: string;
+  classeCode?: string;
+}
 
 /* ─── Helpers ──────────────────────────────────────────────── */
 const fmt = (iso: string) => {
@@ -34,6 +42,46 @@ const avatar = (nom: string, prenom?: string) =>
   `${(prenom || "")[0] || ""}${(nom || "")[0] || ""}`.toUpperCase() || "?";
 const photoUrl = (p?: string | null) =>
   p ? (p.startsWith("http") ? p : `${API_URL}${p.startsWith("/") ? "" : "/"}${p}`) : null;
+
+const dayNamesFr = ["DIMANCHE", "LUNDI", "MARDI", "MERCREDI", "JEUDI", "VENDREDI", "SAMEDI"];
+
+const isSeanceRequest = (text: string) => /seance|séance/i.test(text);
+
+const parseSeanceDate = (text: string) => {
+  const lower = text.toLowerCase();
+  const base = new Date();
+
+  if (lower.includes("demain")) return new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1);
+  if (lower.includes("hier")) return new Date(base.getFullYear(), base.getMonth(), base.getDate() - 1);
+  if (lower.includes("aujourd")) return base;
+
+  const match = lower.match(/(\d{2})[\/.-](\d{2})[\/.-](\d{4})/);
+  if (!match) return base;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const parsed = new Date(year, month - 1, day);
+  return Number.isNaN(parsed.getTime()) ? base : parsed;
+};
+
+const normalizeClasseCode = (classeCode?: string) => {
+  if (!classeCode) return "CLASSE";
+  const normalized = classeCode.trim().toUpperCase();
+  return /^[A-Z]{3}[1-3][A-D]$/.test(normalized) ? normalized.slice(0, 4) : normalized;
+};
+
+const formatSeances = (seances: SeanceItem[]) => {
+  if (!seances.length) return "Aucune seance";
+  return seances.map(s => {
+    const code = normalizeClasseCode(s.classeCode);
+    const semestre = s.semestre || "";
+    const matiere = s.matiereNom || "";
+    const debut = s.heureDebut || "";
+    const fin = s.heureFin || "";
+    return `${code}-${semestre}- ${matiere} - ${debut} - ${fin}`.trim();
+  }).join("\n");
+};
 
 /* ─── Chatbot responses ────────────────────────────────────── */
 const GROQ_API_KEY = process.env.NEXT_PUBLIC_GROQ_API_KEY || "";
@@ -62,9 +110,11 @@ async function getGroqResponse(text: string, context: any): Promise<string> {
             CONSIGNES CRITIQUES :
             1. Si l'utilisateur demande ses séances d' "aujourd'hui", tu dois UNIQUEMENT lister les séances où 'jourSemaine' est "${todayFr}".
             2. Si l'utilisateur demande ses séances de "demain", tu dois UNIQUEMENT lister les séances du jour suivant.
-            3. RÈGLE DE SEMESTRE : Comme nous sommes après le 15 Janvier, tu ne dois JAMAIS afficher de séances dont le 'semestre' est S1, S3 ou S5. Affiche uniquement S2, S4 ou S6.
-            4. FORMAT : Affiche toujours le code de la classe (ex: LCS2A) pour chaque séance.
-            5. Si aucune séance ne correspond, dis-le explicitement.
+            3. Si l'utilisateur demande "hier" (ou une date précise), réponds en listant les séances du jour correspondant.
+            4. RÈGLE DE SEMESTRE : Comme nous sommes après le 15 Janvier, tu ne dois JAMAIS afficher de séances dont le 'semestre' est S1, S3 ou S5. Affiche uniquement S2, S4 ou S6.
+            5. FORMAT : Affiche toujours le code de la classe (ex: LCS2A) pour chaque séance.
+            6. FORMAT SORTIE : Une séance par ligne avec le format "CLASSECODE-SEMESTRE- NOMMATIERE - HH:MM:SS - HH:MM:SS". Utilise un saut de ligne entre chaque séance. Aucune phrase supplémentaire.
+            7. Si aucune séance ne correspond, réponds: "Aucune séance".
             
             Données contextuelles : ${contextStr}`
           },
@@ -96,6 +146,15 @@ async function getGroqResponse(text: string, context: any): Promise<string> {
     console.error("Groq connection error:", err);
     return "Désolé, je rencontre une erreur de connexion. Veuillez réessayer plus tard.";
   }
+}
+
+function normalizeBotReply(text: string): string {
+  if (!text) return "Aucune seance";
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (/aucune seance/i.test(compact)) return "Aucune seance";
+  if (/je ne peux pas|impossible|desole/i.test(compact)) return "Aucune seance";
+  const firstSentence = compact.split(/(?<=\.)\s+/)[0] || compact;
+  return firstSentence.length > 120 ? `${firstSentence.slice(0, 117)}...` : firstSentence;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -254,7 +313,27 @@ export default function EnseignantChatPage() {
 
     setBotMsgs(prev => [...prev, { role: "user", text: userText, time: now }]);
 
-    const reply = await getGroqResponse(userText, academicContext);
+    if (isSeanceRequest(userText)) {
+      try {
+        const targetDate = parseSeanceDate(userText);
+        const isoDate = targetDate.toISOString().slice(0, 10);
+        const dayName = dayNamesFr[targetDate.getDay()];
+        const data = await api.get(`/api/enseignant/seances?referenceDate=${isoDate}`);
+        const list = Array.isArray(data) ? data : [];
+        const filtered = list.filter((s: SeanceItem) => s.jourSemaine === dayName);
+        const reply = formatSeances(filtered);
+        const replyTime = fmt(new Date().toISOString());
+        setBotMsgs(prev => [...prev, { role: "bot", text: reply, time: replyTime }]);
+      } catch {
+        const replyTime = fmt(new Date().toISOString());
+        setBotMsgs(prev => [...prev, { role: "bot", text: "Aucune seance", time: replyTime }]);
+      } finally {
+        setBotLoading(false);
+      }
+      return;
+    }
+
+    const reply = normalizeBotReply(await getGroqResponse(userText, academicContext));
     const replyTime = fmt(new Date().toISOString());
 
     setBotMsgs(prev => [...prev, { role: "bot", text: reply, time: replyTime }]);
