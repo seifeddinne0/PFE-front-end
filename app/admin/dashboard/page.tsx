@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookOpen, Calendar, FileText, AlertTriangle, Users, LayoutDashboard, Target, TrendingUp, Award, CreditCard } from "lucide-react";
+import { BookOpen, FileText, AlertTriangle, Users, LayoutDashboard, TrendingUp, TrendingDown, Award, CreditCard, PieChart, Clock, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import RecentNotifications from "@/app/components/RecentNotifications";
@@ -68,6 +68,96 @@ export default function AdminDashboardPage() {
         </div>
     );
 
+    const documentsByType = stats?.documentsByType || {};
+    const documentsAvgProcessingDays = Number(stats?.documentsAvgProcessingDays ?? 0);
+    const documentsAvgProcessingChangePercent = Number(stats?.documentsAvgProcessingChangePercent ?? 0);
+    const documentsAvgProcessingTrend = (stats?.documentsAvgProcessingTrend || "stable") as "up" | "down" | "stable";
+    const recettesParMois = (stats?.recettesParMois || []) as Array<{ month: string; total: number }>;
+    const topClassesAbsences = (stats?.topClassesAbsences || []) as Array<{ classeCode: string; totalAbsences: number }>;
+
+    const docTypeEntries = Object.entries(documentsByType)
+        .map(([key, value]) => [key, Number(value || 0)] as [string, number])
+        .filter(([, value]) => value > 0);
+    const documentsTotal = docTypeEntries.reduce((sum, [, value]) => sum + value, 0);
+    const docColors = ["#03a9f4", "#ff9800", "#9c27b0", "#4caf50", "#f44336", "#009688", "#795548"];
+
+    const formatDocType = (value: string) =>
+        value
+            .toLowerCase()
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (l) => l.toUpperCase());
+
+    const buildPieGradient = () => {
+        if (documentsTotal === 0) return "#e5e7eb";
+        let start = 0;
+        const segments = docTypeEntries.map(([, value], index) => {
+            const percent = (value / documentsTotal) * 100;
+            const end = start + percent;
+            const segment = `${docColors[index % docColors.length]} ${start}% ${end}%`;
+            start = end;
+            return segment;
+        });
+        return `conic-gradient(${segments.join(", ")})`;
+    };
+
+    const buildLinePath = (values: number[], width: number, height: number) => {
+        if (values.length === 0) return "";
+        const maxValue = Math.max(...values, 1);
+        const paddingX = 24;
+        const paddingY = 20;
+        const usableWidth = width - paddingX * 2;
+        const usableHeight = height - paddingY * 2;
+        return values
+            .map((value, index) => {
+                const x = values.length === 1 ? width / 2 : paddingX + (index / (values.length - 1)) * usableWidth;
+                const y = height - paddingY - (value / maxValue) * usableHeight;
+                return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+            })
+            .join(" ");
+    };
+
+    const formatCurrencyDT = (value: number) => {
+        const safeValue = Number.isFinite(value) ? value : 0;
+        return `${safeValue.toFixed(2)} DT`;
+    };
+
+    const formatMonthLabel = (value: string) => {
+        const [yearRaw, monthRaw] = value.split("-");
+        const year = Number(yearRaw);
+        const month = Number(monthRaw);
+        if (!year || !month) return value;
+        const date = new Date(year, month - 1, 1);
+        return date.toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
+    };
+
+    const getDelayTrendLabel = (trend: "up" | "down" | "stable") => {
+        if (trend === "up") return "augmente ce mois-ci";
+        if (trend === "down") return "diminue ce mois-ci";
+        return "stable ce mois-ci";
+    };
+
+    const getDelayTrendStyles = (trend: "up" | "down" | "stable") => {
+        if (trend === "up") {
+            return {
+                badge: "bg-red-50 dark:bg-red-900/20 border-red-100/50 dark:border-red-900/30",
+                icon: "text-red-500",
+                text: "text-red-500"
+            };
+        }
+        if (trend === "down") {
+            return {
+                badge: "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100/50 dark:border-emerald-900/30",
+                icon: "text-emerald-500",
+                text: "text-emerald-600"
+            };
+        }
+        return {
+            badge: "bg-gray-50 dark:bg-slate-800 border-gray-100 dark:border-slate-700",
+            icon: "text-gray-400",
+            text: "text-gray-500"
+        };
+    };
+
     const renderAdminDashboard = () => (
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -78,40 +168,180 @@ export default function AdminDashboardPage() {
                 <StatCard title="Factures" value={stats?.totalFactures || 0} subtitle={`${stats?.facturesNonPayees || 0} Impayees`} icon={CreditCard} color="#4caf50" />
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-                <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm">
+                <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm h-full">
                     <h3 className="text-lg font-bold text-[#042954] dark:text-white mb-6 flex items-center gap-2">
-                        <TrendingUp size={20} className="text-[#ffa000]"/> Statistiques Globales
+                        <PieChart size={20} className="text-[#03a9f4]" /> Documents par type
                     </h3>
-                    <div className="space-y-6">
-                        <div>
-                            <div className="flex justify-between mb-2">
-                                <span className="text-sm font-bold text-gray-600 dark:text-slate-300">Taux de présence estimé</span>
-                                <span className="text-sm font-bold text-green-500">92%</span>
-                            </div>
-                            <div className="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-2.5">
-                                <div className="bg-green-500 h-2.5 rounded-full" style={{ width: '92%' }}></div>
+                    <div className="flex flex-col md:flex-row gap-6 items-center">
+                        <div
+                            className="relative w-40 h-40 rounded-full"
+                            style={{ background: buildPieGradient() }}
+                            aria-label="Documents par type"
+                        >
+                            <div className="absolute inset-4 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-center">
+                                <div>
+                                    <div className="text-xs text-gray-500 dark:text-slate-400 font-semibold">Total</div>
+                                    <div className="text-2xl font-black text-[#042954] dark:text-white">{documentsTotal}</div>
+                                </div>
                             </div>
                         </div>
-                        <div>
-                            <div className="flex justify-between mb-2">
-                                <span className="text-sm font-bold text-gray-600 dark:text-slate-300">Résolution des documents</span>
-                                <span className="text-sm font-bold text-[#03a9f4]">85%</span>
-                            </div>
-                            <div className="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-2.5">
-                                <div className="bg-[#03a9f4] h-2.5 rounded-full" style={{ width: '85%' }}></div>
-                            </div>
+                        <div className="flex-1 w-full space-y-2">
+                            {docTypeEntries.length === 0 ? (
+                                <div className="text-sm text-gray-500 dark:text-slate-400">Aucune donnée disponible.</div>
+                            ) : (
+                                docTypeEntries.map(([key, value], index) => (
+                                    <div key={key} className="flex items-center justify-between text-sm">
+                                        <div className="flex items-center gap-2">
+                                            <span
+                                                className="w-3 h-3 rounded-full"
+                                                style={{ backgroundColor: docColors[index % docColors.length] }}
+                                            />
+                                            <span className="font-semibold text-gray-600 dark:text-slate-300">
+                                                {formatDocType(key)}
+                                            </span>
+                                        </div>
+                                        <span className="font-bold text-gray-700 dark:text-slate-200">{value}</span>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>
-                <div className="bg-gradient-to-br from-[#042954] to-[#021833] p-8 rounded-2xl shadow-sm text-white relative overflow-hidden">
-                    <div className="absolute -right-10 -bottom-10 opacity-10"><Target size={150}/></div>
-                    <h3 className="text-lg font-bold mb-2">Objectifs de session</h3>
-                    <p className="text-blue-200 mb-6 text-sm">Progression vers la fin du semestre d'automne</p>
-                    <div className="flex items-end gap-2 mb-2">
-                        <span className="text-[#042954] dark:text-whitexl font-black text-[#ffa000]">75</span>
-                        <span className="text-xl font-bold text-blue-200 mb-1">%</span>
+                <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm h-full">
+                    <h3 className="text-lg font-bold text-[#042954] dark:text-white mb-6">Top 5 classes par absences</h3>
+                    <p className="text-xs text-gray-500 dark:text-slate-400 mb-6">Classes avec le plus d'absences</p>
+                    {topClassesAbsences.length === 0 ? (
+                        <div className="text-sm text-gray-500 dark:text-slate-400">Aucune donnée disponible.</div>
+                    ) : (
+                        <div className="space-y-3">
+                            {topClassesAbsences.map((item, index) => {
+                                const maxValue = Math.max(...topClassesAbsences.map((c) => c.totalAbsences), 1);
+                                const width = Math.round((item.totalAbsences / maxValue) * 100);
+                                return (
+                                    <div key={item.classeCode}>
+                                        <div className="flex items-center justify-between text-xs font-semibold text-gray-600 dark:text-slate-300 mb-1">
+                                            <span>{item.classeCode}</span>
+                                            <span>{item.totalAbsences}</span>
+                                        </div>
+                                        <div className="h-2.5 w-full bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-2.5 rounded-full"
+                                                style={{ width: `${width}%`, backgroundColor: docColors[index % docColors.length] }}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+                <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xl shadow-gray-200/40 dark:shadow-none border border-gray-100 dark:border-slate-700 relative overflow-hidden group hover:shadow-2xl transition-all duration-500 h-full">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 border border-emerald-100/50 dark:border-emerald-900/30">
+                                <Clock size={20} strokeWidth={2.5} />
+                            </div>
+                            <h3 className="text-lg font-black text-[#042954] dark:text-white tracking-tight">Délai Moyen</h3>
+                        </div>
+                        <button className="p-2 text-gray-300 hover:text-gray-600 dark:hover:text-gray-100 transition-all rounded-full hover:bg-gray-50 dark:hover:bg-slate-700">
+                            <MoreVertical size={18} />
+                        </button>
                     </div>
-                    <p className="text-sm text-blue-100 italic">Semaines complétées: 10 sur 14</p>
+
+                    {/* Main Value */}
+                    <div className="mb-8">
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-4xl font-black text-[#042954] dark:text-white tracking-tighter">
+                                {documentsAvgProcessingDays}
+                            </span>
+                            <span className="text-xl font-bold text-gray-300 uppercase tracking-widest">jours</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border ${getDelayTrendStyles(documentsAvgProcessingTrend).badge}`}>
+                                {documentsAvgProcessingTrend === "up" ? (
+                                    <TrendingUp size={14} strokeWidth={3} className={getDelayTrendStyles(documentsAvgProcessingTrend).icon} />
+                                ) : documentsAvgProcessingTrend === "down" ? (
+                                    <TrendingDown size={14} strokeWidth={3} className={getDelayTrendStyles(documentsAvgProcessingTrend).icon} />
+                                ) : (
+                                    <TrendingDown size={14} strokeWidth={3} className={getDelayTrendStyles(documentsAvgProcessingTrend).icon} />
+                                )}
+                                <span className={`text-xs font-black ${getDelayTrendStyles(documentsAvgProcessingTrend).text}`}>
+                                    {documentsAvgProcessingChangePercent}%
+                                </span>
+                            </div>
+                            <span className="text-xs text-gray-400 font-bold">{getDelayTrendLabel(documentsAvgProcessingTrend)}</span>
+                        </div>
+                    </div>
+
+                    {/* Details Section */}
+                    <div className="bg-[#f8f9fa] dark:bg-slate-900/50 rounded-2xl p-5 space-y-4 border border-gray-50 dark:border-slate-800/50">
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500 dark:text-slate-400 font-extrabold tracking-wide uppercase">Total Traités :</span>
+                            <span className="text-[#042954] dark:text-white font-black text-base">{stats?.totalDocuments || 0}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-t border-gray-200 dark:border-slate-800 pt-4 text-xs">
+                            <span className="text-gray-500 dark:text-slate-400 font-extrabold tracking-wide uppercase">En Attente :</span>
+                            <span className="text-[#042954] dark:text-white font-black text-base">{stats?.documentsEnAttente || 0}</span>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm h-full">
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h3 className="text-lg font-bold text-[#042954] dark:text-white">Recettes par mois</h3>
+                            <p className="text-xs text-gray-500 dark:text-slate-400">Total paye (DT)</p>
+                        </div>
+                    </div>
+                    {recettesParMois.length === 0 ? (
+                        <div className="text-sm text-gray-500 dark:text-slate-400">Aucune donnée disponible.</div>
+                    ) : (
+                        <div className="w-full">
+                            <svg viewBox="0 0 420 180" className="w-full h-44">
+                                <defs>
+                                    <linearGradient id="receiptsLine" x1="0" x2="1" y1="0" y2="0">
+                                        <stop offset="0%" stopColor="#03a9f4" />
+                                        <stop offset="100%" stopColor="#00c853" />
+                                    </linearGradient>
+                                </defs>
+                                <path
+                                    d={buildLinePath(recettesParMois.map((r) => r.total), 420, 180)}
+                                    fill="none"
+                                    stroke="url(#receiptsLine)"
+                                    strokeWidth="3"
+                                    strokeLinecap="round"
+                                />
+                                {recettesParMois.map((point, index) => {
+                                    const values = recettesParMois.map((r) => r.total);
+                                    const maxValue = Math.max(...values, 1);
+                                    const paddingX = 24;
+                                    const paddingY = 20;
+                                    const usableWidth = 420 - paddingX * 2;
+                                    const usableHeight = 180 - paddingY * 2;
+                                    const x = recettesParMois.length === 1 ? 210 : paddingX + (index / (recettesParMois.length - 1)) * usableWidth;
+                                    const y = 180 - paddingY - (point.total / maxValue) * usableHeight;
+                                    const label = `${formatMonthLabel(point.month)}: ${formatCurrencyDT(point.total)}`;
+                                    return (
+                                        <g key={point.month}>
+                                            <circle cx={x} cy={y} r="6" fill="#ffffff" stroke="#03a9f4" strokeWidth="3">
+                                                <title>{label}</title>
+                                            </circle>
+                                        </g>
+                                    );
+                                })}
+                            </svg>
+                            <div className="grid grid-cols-6 gap-2 text-[10px] text-gray-400 mt-2">
+                                {recettesParMois.slice(-6).map((point) => (
+                                    <div key={point.month} className="text-center truncate">
+                                        {formatMonthLabel(point.month)}
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="text-[10px] text-gray-400 mt-3">Survolez un point pour voir le montant.</div>
+                        </div>
+                    )}
                 </div>
             </div>
             <div className="mt-8">
@@ -161,7 +391,7 @@ export default function AdminDashboardPage() {
                     </div>
                     {role !== "ROLE_ADMIN" && (
                         <div className="flex-shrink-0">
-                            <Link 
+                            <Link
                                 href="/dashboard/profile"
                                 className="group relative inline-flex items-center justify-center bg-[#ffa000] text-[#042954] dark:text-white font-black py-4 px-8 rounded-xl transition-all shadow-xl hover:shadow-[#ffa000]/30 hover:scale-105 overflow-hidden"
                             >

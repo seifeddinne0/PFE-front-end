@@ -31,7 +31,6 @@ export default function EnseignantsListPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(5);
-    const [filterFiliere, setFilterFiliere] = useState("Tous");
     
     const [filieres, setFilieres] = useState<any[]>([]);
     const [niveaux, setNiveaux] = useState<any[]>([]);
@@ -130,9 +129,14 @@ export default function EnseignantsListPage() {
             ? "Voulez-vous donner l'accès de gestion des notes à tous les enseignants ?"
             : "Voulez-vous retirer l'accès de gestion des notes à tous les enseignants ?";
 
-        if (!window.confirm(confirmText)) {
-            return;
-        }
+        const isConfirmed = await confirm({
+            title: enableAccess ? "Donner acces notes" : "Retirer acces notes",
+            message: confirmText,
+            confirmText: enableAccess ? "Donner acces" : "Retirer acces",
+            cancelText: "Annuler",
+            variant: enableAccess ? "info" : "warning"
+        });
+        if (!isConfirmed) return;
 
         try {
             const response = await api.patch(`/api/admin/enseignants/notes-access/all?enabled=${enableAccess}`, {});
@@ -148,17 +152,15 @@ export default function EnseignantsListPage() {
         }
     };
 
-    // Filtrer les enseignants (recherche + filière)
+    // Filtrer les enseignants (recherche)
     const filteredEnseignants = enseignants.filter(e => {
         const matchesSearch = 
             e.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
             e.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
             e.matricule.toLowerCase().includes(searchTerm.toLowerCase()) ||
             e.email.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        const matchesFiliere = filterFiliere === "Tous" || e.filiereCode === filterFiliere;
-        
-        return matchesSearch && matchesFiliere;
+
+        return matchesSearch;
     });
 
     // Pagination
@@ -215,25 +217,6 @@ export default function EnseignantsListPage() {
                             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                             className="w-full sm:w-64 pl-10 pr-4 py-2 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-zinc-800 dark:text-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ffa000] focus:border-transparent transition-shadow text-sm"
                         />
-                    </div>
-
-                    <div className="flex bg-gray-100 dark:bg-zinc-800/50 p-1 rounded-lg border border-gray-200 dark:border-zinc-800">
-                        {["Tous", "LCS", "LCE", "LBC"].map((f) => (
-                            <button
-                                key={f}
-                                onClick={() => {
-                                    setFilterFiliere(f);
-                                    setCurrentPage(1);
-                                }}
-                                className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${
-                                    filterFiliere === f
-                                        ? "bg-white dark:bg-zinc-700 text-[#ffa000] shadow-sm"
-                                        : "text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200"
-                                }`}
-                            >
-                                {f}
-                            </button>
-                        ))}
                     </div>
 
                     <Link
