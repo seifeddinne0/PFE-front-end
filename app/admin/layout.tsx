@@ -77,6 +77,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: "Tableau de bord", href: "/admin/dashboard", icon: LayoutDashboard },
         { name: "Étudiants", href: "/admin/etudiants", icon: Users },
         { name: "Enseignants", href: "/admin/enseignants", icon: User },
+        { name: "Emploi du temps", href: "/admin/emploi-du-temps", icon: Calendar },
+        { name: "Affectations", href: "/admin/affectations", icon: BookOpen },
         { name: "Notes & Résultats", href: "/admin/notes", icon: FileText },
         { name: "Absences", href: "/admin/absences", icon: UserX },
         { name: "Factures", href: "/admin/factures", icon: CreditCard },

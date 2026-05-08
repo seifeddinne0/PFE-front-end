@@ -23,6 +23,17 @@ interface Msg {
   deleted?: boolean; edited?: boolean;
 }
 interface ChatMsg { role: "user" | "bot"; text: string; time: string }
+interface SeanceItem {
+  jourSemaine?: string;
+  heureDebut?: string;
+  heureFin?: string;
+  matiereNom?: string;
+  semestre?: string;
+  classeCode?: string;
+  typeSeance?: string;
+  niveauCode?: string;
+  creneauLabel?: string;
+}
 
 const fmt = (iso: string) => {
   try { return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }); }
@@ -32,6 +43,53 @@ const avatar = (nom: string, prenom?: string) =>
   `${(prenom || "")[0] || ""}${(nom || "")[0] || ""}`.toUpperCase() || "?";
 const photoUrl = (p?: string | null) =>
   p ? (p.startsWith("http") ? p : `${API_URL}${p.startsWith("/") ? "" : "/"}${p}`) : null;
+
+const dayNamesFr = ["DIMANCHE", "LUNDI", "MARDI", "MERCREDI", "JEUDI", "VENDREDI", "SAMEDI"];
+
+const isSeanceRequest = (text: string) => /seance|séance/i.test(text);
+
+const parseSeanceDate = (text: string) => {
+  const lower = text.toLowerCase();
+  const base = new Date();
+
+  if (lower.includes("demain")) return new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1);
+  if (lower.includes("hier")) return new Date(base.getFullYear(), base.getMonth(), base.getDate() - 1);
+  if (lower.includes("aujourd")) return base;
+
+  const match = lower.match(/(\d{2})[\/.-](\d{2})[\/.-](\d{4})/);
+  if (!match) return base;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const parsed = new Date(year, month - 1, day);
+  return Number.isNaN(parsed.getTime()) ? base : parsed;
+};
+
+const normalizeClasseCode = (classeCode?: string) => {
+  if (!classeCode) return "CLASSE";
+  const normalized = classeCode.trim().toUpperCase();
+  return /^[A-Z]{3}[1-3][A-D]$/.test(normalized) ? normalized.slice(0, 4) : normalized;
+};
+
+const normalizeSeanceLine = (s: SeanceItem) => {
+  const scope = s.typeSeance || "";
+  const classe = normalizeClasseCode(s.classeCode);
+  const time = s.creneauLabel || `${s.heureDebut || ""} - ${s.heureFin || ""}`;
+  return `${scope} ${classe} ${s.semestre || ""} ${s.matiereNom || ""} ${time}`.replace(/\s+/g, " ").trim();
+};
+
+const formatSeances = (seances: SeanceItem[]) => {
+  if (!seances.length) return "Aucune seance";
+  return seances.map(s => {
+    return normalizeSeanceLine(s);
+  }).join("\n");
+};
+
+const toSeanceList = (data: unknown) => Array.isArray(data) ? data as SeanceItem[] : [];
+
+const filterSeancesByDay = (list: SeanceItem[], dayName: string) =>
+  list.filter(s => (s.jourSemaine || "").toUpperCase() === dayName);
 
 const GROQ_API_KEY = process.env.NEXT_PUBLIC_GROQ_API_KEY || "";
 
@@ -244,6 +302,30 @@ export default function EtudiantChatPage() {
     setBotLoading(true);
 
     setBotMsgs(prev => [...prev, { role: "user", text: userText, time: now }]);
+
+    if (isSeanceRequest(userText)) {
+      try {
+        const targetDate = parseSeanceDate(userText);
+        const isoDate = targetDate.toISOString().slice(0, 10);
+        const dayName = dayNamesFr[targetDate.getDay()];
+        let list = toSeanceList(await api.get(`/api/etudiant/seances?referenceDate=${isoDate}`));
+        if (!list.length && academicContext?.seances) {
+          list = toSeanceList(academicContext.seances);
+        }
+        const reply = formatSeances(list);
+        const replyTime = fmt(new Date().toISOString());
+        setBotMsgs(prev => [...prev, { role: "bot", text: reply, time: replyTime }]);
+      } catch {
+        const replyTime = fmt(new Date().toISOString());
+        const dayName = dayNamesFr[parseSeanceDate(userText).getDay()];
+        const cached = toSeanceList(academicContext?.seances);
+        const reply = formatSeances(cached);
+        setBotMsgs(prev => [...prev, { role: "bot", text: reply, time: replyTime }]);
+      } finally {
+        setBotLoading(false);
+      }
+      return;
+    }
 
     const reply = await getGroqResponse(userText, academicContext);
     const replyTime = fmt(new Date().toISOString());

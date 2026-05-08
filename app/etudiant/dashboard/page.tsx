@@ -5,10 +5,12 @@ import { BookOpen, Calendar, FileText, AlertTriangle, Users, LayoutDashboard, Ta
 import Link from "next/link";
 import { api } from "@/lib/api";
 import RecentNotifications from "@/app/components/RecentNotifications";
+import EtudiantSchedule from "@/app/components/EtudiantSchedule";
 
 export default function EtudiantDashboardPage() {
     const [role, setRole] = useState<string | null>(null);
     const [stats, setStats] = useState<any>(null);
+    const [seances, setSeances] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -27,11 +29,16 @@ export default function EtudiantDashboardPage() {
                     const data = await api.get("/api/enseignant/dashboard");
                     setStats(data);
                 } else if (userRole === "ROLE_ETUDIANT") {
-                    const data = await api.get("/api/etudiant/dashboard");
-                    setStats(data);
+                    const [dashboardData, seancesData] = await Promise.all([
+                        api.get("/api/etudiant/dashboard"),
+                        api.get("/api/etudiant/seances")
+                    ]);
+                    setStats(dashboardData);
+                    setSeances(Array.isArray(seancesData) ? seancesData : (seancesData?.content || []));
                 }
             } catch (error) {
                 console.error("Erreur chargement dashboard", error);
+                setSeances([]);
             } finally {
                 setIsLoading(false);
             }
@@ -157,6 +164,10 @@ export default function EtudiantDashboardPage() {
                 <StatCard title="Documents" value={stats?.totalDocuments || 0} subtitle={`${stats?.documentsEnAttente || 0} En attente`} icon={FileText} color="#ff9800" />
                 <StatCard title="Factures" value={stats?.totalFactures || 0} subtitle={`${stats?.facturesNonPayees || 0} Non payees`} icon={CreditCard} color="#4caf50" />
             </div>
+            <EtudiantSchedule
+                seances={seances}
+                classeLabel={seances.find((item) => item?.classeCode)?.classeCode || stats?.niveauCode}
+            />
             <div className="mt-8">
                 <RecentNotifications />
             </div>

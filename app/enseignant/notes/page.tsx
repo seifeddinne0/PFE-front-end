@@ -39,6 +39,7 @@ export default function EnseignantNotesPage() {
     const [classes, setClasses] = useState<any[]>([]);
     const [filieres, setFilieres] = useState<any[]>([]);
     const [matieres, setMatieres] = useState<any[]>([]);
+    const [seances, setSeances] = useState<any[]>([]);
     const [enseignantMatieresId, setEnseignantMatieresId] = useState<number[]>([]);
     const [enseignantId, setEnseignantId] = useState<number | null>(null);
     const [canManageNotes, setCanManageNotes] = useState<boolean>(false);
@@ -84,7 +85,10 @@ export default function EnseignantNotesPage() {
                 setEtudiants(Array.isArray(etudiantsData) ? etudiantsData : etudiantsData.content || []);
                 setNotes(Array.isArray(notesData) ? notesData : notesData.content || []);
                 
-                const seanceMatiereIds = [...new Set(Array.isArray(seancesData) ? seancesData.map((s: any) => s.matiereId) : [])] as number[];
+                // CRITICAL FIX: The API might return a paginated object { content: [...] } instead of a raw array
+                const seancesArray = Array.isArray(seancesData) ? seancesData : (seancesData?.content || []);
+                setSeances(seancesArray);
+                const seanceMatiereIds = [...new Set(seancesArray.map((s: any) => s.matiereId))] as number[];
                 setEnseignantMatieresId(seanceMatiereIds);
 
             } catch (error) {
@@ -127,19 +131,31 @@ export default function EnseignantNotesPage() {
             return;
         }
         
-        // Find matieres assigned to this teacher for this semester
-        // We check both the direct 'enseignantId' (database schema) and 'seances' mapping
-        const teacherMats = matieres.filter(m => 
-            (enseignantId && m.enseignantId === enseignantId && m.semestre === selectedSemestre) ||
-            (enseignantMatieresId.includes(m.id) && m.semestre === selectedSemestre)
-        );
+        // Find matieres assigned to this teacher for this semester AND this specific class
+        const teacherMats = matieres.filter(m => {
+            if (m.semestre !== selectedSemestre) return false;
+            
+            const isMine = enseignantMatieresId.includes(m.id) || (enseignantId && m.enseignantId === enseignantId);
+            const matchesNiveau = (!selectedNiveau || m.niveauCode === selectedNiveau || String(m.niveauId) === selectedNiveau);
+            
+            return isMine && matchesNiveau;
+        });
         
         if (teacherMats.length > 0) {
-            setSelectedMatiere(String(teacherMats[0].id));
+            // Find the best match: prioritize the one that has a specific seance for this classe
+            const bestMatch = teacherMats.find(m => 
+                seances.some(s => String(s.matiereId) === String(m.id) && String(s.classeId) === selectedClasse)
+            );
+            
+            if (bestMatch) {
+                setSelectedMatiere(String(bestMatch.id));
+            } else {
+                setSelectedMatiere(String(teacherMats[0].id));
+            }
         } else {
             setSelectedMatiere("");
         }
-    }, [selectedSemestre, selectedClasse, enseignantMatieresId, enseignantId, semesterMatieres, matieres]);
+    }, [selectedSemestre, selectedClasse, selectedNiveau, enseignantMatieresId, enseignantId, matieres, seances]);
 
     // When selections change, compute initial drafts
     useEffect(() => {
@@ -456,10 +472,10 @@ export default function EnseignantNotesPage() {
                     <div className="space-y-2">
                         <label className="text-sm font-bold text-gray-600 dark:text-slate-300">Semestre</label>
                         <select value={selectedSemestre} onChange={e => setSelectedSemestre(e.target.value)} className={inputCls} disabled={!selectedNiveau}>
-                            {(!selectedNiveau ? SEMESTRES : 
+                            {(!selectedNiveau ? ["S1", "S2", "S3", "S4", "S5"] : 
                                 selectedNiveau.includes("1") ? ["S1", "S2"] : 
                                 selectedNiveau.includes("2") ? ["S3", "S4"] : 
-                                selectedNiveau.includes("3") ? ["S5"] : SEMESTRES
+                                selectedNiveau.includes("3") ? ["S5"] : ["S1", "S2", "S3", "S4", "S5"]
                             ).map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>
@@ -501,9 +517,9 @@ export default function EnseignantNotesPage() {
                                     <tr className="bg-gray-50 dark:bg-slate-700/50 text-gray-500 dark:text-slate-400 border-b border-gray-100 dark:border-slate-700 text-sm">
                                         <th className="p-4 font-semibold w-16 text-center">N°</th>
                                         <th className="p-4 font-semibold min-w-[200px]">Identité</th>
-                                        <th className="p-4 font-semibold text-center w-32">DS</th>
-                                        <th className="p-4 font-semibold text-center w-32">Travaux (TP)</th>
-                                        <th className="p-4 font-semibold text-center w-32">Examen</th>
+                                        <th className="p-4 font-semibold text-center w-32">DS (30%)</th>
+                                        <th className="p-4 font-semibold text-center w-32">Examen (70%)</th>
+                                        <th className="p-4 font-semibold text-center w-32">Moyenne</th>
                                         <th className="p-4 font-semibold text-center w-32">Actions</th>
                                     </tr>
                                 </thead>
@@ -558,10 +574,26 @@ export default function EnseignantNotesPage() {
                                                     <NoteInput type="CONTROLE" placeholder="DS /20" />
                                                 </td>
                                                 <td className="p-4 px-2">
-                                                    <NoteInput type="TP" placeholder="TP /20" />
-                                                </td>
-                                                <td className="p-4 px-2">
                                                     <NoteInput type="EXAMEN" placeholder="EX /20" />
+                                                </td>
+                                                <td className="p-4 px-2 text-center">
+                                                    {(() => {
+                                                        const dsStr = drafts.CONTROLE?.note;
+                                                        const exStr = drafts.EXAMEN?.note;
+                                                        if (!dsStr && !exStr) return <span className="text-gray-400 font-medium">--</span>;
+                                                        
+                                                        const ds = parseFloat(dsStr || "0");
+                                                        const ex = parseFloat(exStr || "0");
+                                                        const moyenne = (ds * 0.3) + (ex * 0.7);
+                                                        
+                                                        return (
+                                                            <div className="flex flex-col items-center justify-center">
+                                                                <span className={`font-black text-lg ${moyenne >= 10 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                                                                    {moyenne.toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </td>
                                                 <td className="p-4">
                                                     <div className="flex items-center justify-center gap-2">

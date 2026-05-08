@@ -626,16 +626,14 @@ export default function EnseignantAbsencesPage() {
                                             <button
                                                 key={etudiant.id}
                                                 onClick={() => toggleAbsent(etudiant.id)}
-                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
-                                                    isAbsent
+                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${isAbsent
                                                         ? "border-red-200 bg-red-50"
                                                         : "border-transparent bg-white dark:bg-slate-800 hover:bg-gray-50 dark:bg-slate-800/50 hover:border-gray-200 dark:border-slate-700"
-                                                }`}
+                                                    }`}
                                             >
                                                 <div
-                                                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center ${
-                                                        isAbsent ? "bg-red-500 border-red-500" : "border-gray-300 dark:border-slate-600"
-                                                    }`}
+                                                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center ${isAbsent ? "bg-red-500 border-red-500" : "border-gray-300 dark:border-slate-600"
+                                                        }`}
                                                 >
                                                     {isAbsent && <Check size={12} className="text-white" strokeWidth={3} />}
                                                 </div>
@@ -647,9 +645,8 @@ export default function EnseignantAbsencesPage() {
                                                     <div className="text-[11px] text-gray-400 dark:text-slate-500 font-mono">{etudiant.matricule}</div>
                                                 </div>
                                                 <span
-                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                                        isAbsent ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-500"
-                                                    }`}
+                                                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${isAbsent ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-500"
+                                                        }`}
                                                 >
                                                     {isAbsent ? "Absent" : "Present"}
                                                 </span>
@@ -672,9 +669,8 @@ export default function EnseignantAbsencesPage() {
                             <button
                                 onClick={handleSubmitAbsences}
                                 disabled={submitting || loadingModal}
-                                className={`px-6 py-2.5 rounded-lg font-bold text-white transition-all shadow-md flex items-center gap-2 text-sm ${
-                                    submitting ? "bg-[#ffc166] cursor-not-allowed" : "bg-[#ffa000] hover:bg-[#ff8f00]"
-                                }`}
+                                className={`px-6 py-2.5 rounded-lg font-bold text-white transition-all shadow-md flex items-center gap-2 text-sm ${submitting ? "bg-[#ffc166] cursor-not-allowed" : "bg-[#ffa000] hover:bg-[#ff8f00]"
+                                    }`}
                             >
                                 <Save size={16} />
                                 {submitting

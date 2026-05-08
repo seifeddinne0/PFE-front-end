@@ -170,7 +170,18 @@ export const api = {
         });
 
         if (!res.ok) {
-            throw new Error("Erreur lors de la mise à jour des données");
+            let backendMessage = "";
+            try {
+                const payload = await res.json();
+                backendMessage = payload?.message || "";
+            } catch {
+                backendMessage = "";
+            }
+
+            const message = backendMessage || "Erreur lors de la mise à jour des données";
+            const error: Error & { status?: number } = new Error(message);
+            error.status = res.status;
+            throw error;
         }
 
         return res.json();
@@ -188,7 +199,18 @@ export const api = {
         });
 
         if (!res.ok) {
-            throw new Error("Erreur lors de la mise à jour des données");
+            let backendMessage = "";
+            try {
+                const payload = await res.json();
+                backendMessage = payload?.message || "";
+            } catch {
+                backendMessage = "";
+            }
+
+            const message = backendMessage || "Erreur lors de la mise à jour des données";
+            const error: Error & { status?: number } = new Error(message);
+            error.status = res.status;
+            throw error;
         }
 
         return res.json();

@@ -83,6 +83,11 @@ const formatSeances = (seances: SeanceItem[]) => {
   }).join("\n");
 };
 
+const toSeanceList = (data: unknown) => Array.isArray(data) ? data as SeanceItem[] : [];
+
+const filterSeancesByDay = (list: SeanceItem[], dayName: string) =>
+  list.filter(s => (s.jourSemaine || "").toUpperCase() === dayName);
+
 /* ─── Chatbot responses ────────────────────────────────────── */
 const GROQ_API_KEY = process.env.NEXT_PUBLIC_GROQ_API_KEY || "";
 
@@ -317,16 +322,16 @@ export default function EnseignantChatPage() {
       try {
         const targetDate = parseSeanceDate(userText);
         const isoDate = targetDate.toISOString().slice(0, 10);
-        const dayName = dayNamesFr[targetDate.getDay()];
         const data = await api.get(`/api/enseignant/seances?referenceDate=${isoDate}`);
         const list = Array.isArray(data) ? data : [];
-        const filtered = list.filter((s: SeanceItem) => s.jourSemaine === dayName);
-        const reply = formatSeances(filtered);
+        const reply = formatSeances(list);
         const replyTime = fmt(new Date().toISOString());
         setBotMsgs(prev => [...prev, { role: "bot", text: reply, time: replyTime }]);
       } catch {
         const replyTime = fmt(new Date().toISOString());
-        setBotMsgs(prev => [...prev, { role: "bot", text: "Aucune seance", time: replyTime }]);
+        const cached = toSeanceList(academicContext?.seances);
+        const reply = formatSeances(cached);
+        setBotMsgs(prev => [...prev, { role: "bot", text: reply, time: replyTime }]);
       } finally {
         setBotLoading(false);
       }
