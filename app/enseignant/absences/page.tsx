@@ -14,6 +14,8 @@ import {
     X,
     Clock,
     Filter,
+    MapPin,
+    BookOpen
 } from "lucide-react";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
@@ -33,6 +35,7 @@ interface Seance {
     classeNom?: string;
     enseignantId: number;
     enseignantNom: string;
+    typeSeance?: "COURS" | "TD";
 }
 
 interface Etudiant {
@@ -82,6 +85,9 @@ interface CalendarEvent {
     extendedProps: {
         seance: Seance;
     };
+    backgroundColor?: string;
+    borderColor?: string;
+    textColor?: string;
 }
 
 interface VacationBackgroundEvent {
@@ -204,12 +210,26 @@ export default function EnseignantAbsencesPage() {
                 return [];
             }
 
+            let heureDebut = seance.heureDebut;
+            let heureFin = seance.heureFin;
+            
+            if ((seance as any).creneauLabel) {
+                const parts = (seance as any).creneauLabel.split(" - ");
+                if (parts.length === 2) {
+                    heureDebut = parts[0].trim();
+                    heureFin = parts[1].trim();
+                }
+            }
+
             const roomLabel = seance.salle?.trim() ? seance.salle.trim() : "Salle N/A";
             return [{
                 id: String(seance.id),
                 title: `${seance.matiereNom} • ${seance.classeCode} • ${roomLabel}`,
-                start: toEventDateTime(eventDate, seance.heureDebut),
-                end: toEventDateTime(eventDate, seance.heureFin),
+                start: toEventDateTime(eventDate, heureDebut),
+                end: toEventDateTime(eventDate, heureFin),
+                backgroundColor: seance.typeSeance === "TD" ? "#eab308" : "#3b82f6",
+                borderColor: seance.typeSeance === "TD" ? "#ca8a04" : "#2563eb",
+                textColor: seance.typeSeance === "TD" ? "#ffffff" : "#ffffff",
                 extendedProps: {
                     seance,
                 },
@@ -314,7 +334,7 @@ export default function EnseignantAbsencesPage() {
 
         try {
             const [studentsData, absencesData] = await Promise.all([
-                api.get(`/api/enseignant/classes/${seance.classeId}/etudiants`),
+                api.get(`/api/enseignant/seances/${seance.id}/etudiants`),
                 api.get(`/api/enseignant/absences/seance/${seance.id}?date=${dateStr}`),
             ]);
 
@@ -553,6 +573,42 @@ export default function EnseignantAbsencesPage() {
                                 slotMaxTime="18:00:00"
                                 slotDuration="00:30:00"
                                 height="auto"
+                                eventContent={(eventInfo) => {
+                                    const seance = eventInfo.event.extendedProps.seance;
+                                    if (!seance) {
+                                        return <div className="p-1 text-xs">{eventInfo.event.title}</div>;
+                                    }
+                                    
+                                    const isTD = seance.typeSeance === "TD";
+                                    const roomText = seance.salle?.trim() ? seance.salle : "N/A";
+                                    const classText = seance.classeCode || "Classe N/A";
+                                    
+                                    return (
+                                        <div className="flex flex-col h-full w-full p-1 overflow-y-auto no-scrollbar font-sans text-[9px] leading-[1.2] text-white/95">
+                                            <div className="flex justify-between items-start mb-0.5 shrink-0">
+                                                <div className="font-bold tracking-wide">{eventInfo.timeText}</div>
+                                                <span className={`px-1 py-[1px] text-[7.5px] font-bold uppercase rounded ${isTD ? 'bg-amber-600/40 text-white' : 'bg-blue-800/40 text-white'} border ${isTD ? 'border-amber-400/20' : 'border-blue-400/20'}`}>
+                                                    {seance.typeSeance || "COURS"}
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="font-bold mb-1 shrink-0" title={seance.matiereNom}>
+                                                {seance.matiereNom}
+                                            </div>
+                                            
+                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[8.5px] opacity-90 mt-auto shrink-0">
+                                                <div className="flex items-center gap-0.5 shrink-0">
+                                                    <Users size={9} className="shrink-0" />
+                                                    <span className="truncate max-w-[60px]">{classText}</span>
+                                                </div>
+                                                <div className="flex items-center gap-0.5 shrink-0">
+                                                    <MapPin size={9} className="shrink-0" />
+                                                    <span className="truncate max-w-[60px]">{roomText}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }}
                             />
                         </div>
 
@@ -627,8 +683,8 @@ export default function EnseignantAbsencesPage() {
                                                 key={etudiant.id}
                                                 onClick={() => toggleAbsent(etudiant.id)}
                                                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${isAbsent
-                                                        ? "border-red-200 bg-red-50"
-                                                        : "border-transparent bg-white dark:bg-slate-800 hover:bg-gray-50 dark:bg-slate-800/50 hover:border-gray-200 dark:border-slate-700"
+                                                    ? "border-red-200 bg-red-50"
+                                                    : "border-transparent bg-white dark:bg-slate-800 hover:bg-gray-50 dark:bg-slate-800/50 hover:border-gray-200 dark:border-slate-700"
                                                     }`}
                                             >
                                                 <div
