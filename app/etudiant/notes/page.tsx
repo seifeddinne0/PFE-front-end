@@ -46,7 +46,7 @@ function toTypeForFormula(typeNote?: string): "DS" | "TP" | "EXAMEN" | null {
 }
 
 function computeMatiereMoyenne(ds: number | null, tp: number | null, examen: number | null): number {
-    return (examen ?? 0) * 0.7 + (ds ?? 0) * 0.15 + (tp ?? 0) * 0.15;
+    return (examen ?? 0) * 0.7 + (ds ?? 0) * 0.3;
 }
 
 export default function EtudiantNotesPage() {
@@ -275,7 +275,7 @@ export default function EtudiantNotesPage() {
             <div className="flex items-start gap-3 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-100 dark:border-orange-800/40 text-orange-700 dark:text-orange-300 text-sm">
                 <AlertCircle size={20} className="flex-shrink-0 text-orange-600 dark:text-orange-300" />
                 <p>
-                    <strong>Formule :</strong> Moyenne matière = EXAMEN × 0.7 + DS × 0.15 + TP × 0.15.
+                    <strong>Formule :</strong> Moyenne matière = EXAMEN × 0.7 + DS × 0.3.
                 </p>
             </div>
         </div>

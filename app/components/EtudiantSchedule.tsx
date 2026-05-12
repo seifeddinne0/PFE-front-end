@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 
 interface SeanceItem {
+    id?: number;
     jourSemaine?: string;
     heureDebut?: string;
     heureFin?: string;
@@ -13,6 +14,7 @@ interface SeanceItem {
     semestre?: string;
     niveauCode?: string;
     creneauLabel?: string;
+    creneauId?: number;
 }
 
 const DAY_ORDER = ["LUNDI", "MARDI", "MERCREDI", "JEUDI", "VENDREDI", "SAMEDI"] as const;
@@ -70,6 +72,31 @@ export default function EtudiantSchedule({ seances, classeLabel }: EtudiantSched
         });
         return map;
     }, [seances]);
+    const collapseBySlot = (daySeances: SeanceItem[]) => {
+        const preferredClasse = classeLabel?.trim().toUpperCase();
+        const groups = new Map<string, SeanceItem[]>();
+
+        daySeances.forEach((seance) => {
+            const key = seance.creneauId
+                ? `cr-${seance.creneauId}`
+                : `${seance.heureDebut || ""}-${seance.heureFin || ""}`;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(seance);
+        });
+
+        const pickBest = (items: SeanceItem[]) => {
+            if (preferredClasse) {
+                const exactClasse = items.find(
+                    (item) => item.classeCode?.trim().toUpperCase() === preferredClasse
+                );
+                if (exactClasse) return exactClasse;
+            }
+            const withClasse = items.find((item) => item.classeCode);
+            return withClasse || items[0];
+        };
+
+        return Array.from(groups.values()).map(pickBest);
+    };
 
     const hasSeances = seances.length > 0;
     const totalMinutes = (END_HOUR - START_HOUR) * 60;
@@ -122,7 +149,7 @@ export default function EtudiantSchedule({ seances, classeLabel }: EtudiantSched
                                             backgroundImage: "repeating-linear-gradient(to bottom, rgba(148,163,184,0.25) 0, rgba(148,163,184,0.25) 1px, transparent 1px, transparent 60px)"
                                         }}
                                     />
-                                    {(seancesByDay[day] || []).map((seance, index) => {
+                                    {collapseBySlot(seancesByDay[day] || []).map((seance, index) => {
                                         const start = toMinutes(seance.heureDebut);
                                         const end = toMinutes(seance.heureFin);
                                         if (start === null || end === null) return null;
@@ -131,11 +158,14 @@ export default function EtudiantSchedule({ seances, classeLabel }: EtudiantSched
                                         if (clampedEnd <= clampedStart) return null;
                                         const topPct = ((clampedStart - START_HOUR * 60) / totalMinutes) * 100;
                                         const heightPct = ((clampedEnd - clampedStart) / totalMinutes) * 100;
+                                        const isTD = seance.typeSeance?.trim().toUpperCase() === "TD";
 
                                         return (
                                             <div
-                                                key={`${seance.matiereNom}-${index}`}
-                                                className="absolute left-2 right-2 rounded-lg bg-[#3b82f6] text-white text-xs shadow-md px-2 py-1.5"
+                                                key={`${seance.id ?? seance.matiereNom}-${index}`}
+                                                className={`absolute left-2 right-2 rounded-lg text-white text-xs shadow-md px-2 py-1.5 ${
+                                                    isTD ? "bg-[#facc15] text-[#1f2937]" : "bg-[#3b82f6]"
+                                                }`}
                                                 style={{ top: `${topPct}%`, height: `${heightPct}%` }}
                                             >
                                                 <div className="font-semibold">{seance.creneauLabel || `${formatTime(seance.heureDebut)} - ${formatTime(seance.heureFin)}`}</div>

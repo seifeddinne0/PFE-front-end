@@ -91,6 +91,22 @@ const toSeanceList = (data: unknown) => Array.isArray(data) ? data as SeanceItem
 const filterSeancesByDay = (list: SeanceItem[], dayName: string) =>
   list.filter(s => (s.jourSemaine || "").toUpperCase() === dayName);
 
+const dayTokens: Record<string, string> = {
+  lundi: "LUNDI",
+  mardi: "MARDI",
+  mercredi: "MERCREDI",
+  jeudi: "JEUDI",
+  vendredi: "VENDREDI",
+  samedi: "SAMEDI",
+  dimanche: "DIMANCHE",
+};
+
+const getDayFromText = (text: string) => {
+  const lower = text.toLowerCase();
+  const entry = Object.entries(dayTokens).find(([k]) => lower.includes(k));
+  return entry ? entry[1] : null;
+};
+
 const GROQ_API_KEY = process.env.NEXT_PUBLIC_GROQ_API_KEY || "";
 
 async function getGroqResponse(text: string, context: any): Promise<string> {
@@ -119,14 +135,15 @@ async function getGroqResponse(text: string, context: any): Promise<string> {
             2. Si l'utilisateur demande ses séances de "demain", tu dois UNIQUEMENT lister les séances du jour suivant.
             3. RÈGLE DE SEMESTRE : Comme nous sommes après le 15 Janvier, tu ne dois JAMAIS afficher de séances dont le 'semestre' est S1, S3 ou S5. Affiche uniquement S2, S4 ou S6.
             4. FORMAT : Affiche toujours le code de la classe (ex: LCS2A) pour chaque séance.
-            5. Si aucune séance ne correspond, dis-le explicitement.
+            5. Reponds tres court (max 2 lignes).
+            6. Si aucune séance ne correspond, dis-le explicitement.
             
             Données contextuelles : ${contextStr}`
           },
           { role: "user", content: text }
         ],
         temperature: 0.2,
-        max_tokens: 1024
+        max_tokens: 140
       })
     });
 
@@ -293,6 +310,28 @@ export default function EtudiantChatPage() {
     }
   };
 
+  const buildCompactContext = () => {
+    if (!academicContext) return { info: "Contexte non disponible" };
+    const now = new Date();
+    const dayName = dayNamesFr[now.getDay()];
+    const seances = toSeanceList(academicContext.seances);
+    const seancesDuJour = filterSeancesByDay(seances, dayName).slice(0, 20).map(s => ({
+      jourSemaine: s.jourSemaine,
+      heureDebut: s.heureDebut,
+      heureFin: s.heureFin,
+      matiereNom: s.matiereNom,
+      typeSeance: s.typeSeance,
+      classeCode: s.classeCode,
+      semestre: s.semestre,
+      creneauLabel: s.creneauLabel,
+    }));
+    return {
+      INFORMATION_TEMPORELLE: academicContext.INFORMATION_TEMPORELLE,
+      dashboard: academicContext.dashboard,
+      seances_du_jour: seancesDuJour,
+    };
+  };
+
   const sendBotMessage = async () => {
     if (!botInput.trim() || botLoading) return;
     const userText = botInput.trim();
@@ -303,31 +342,19 @@ export default function EtudiantChatPage() {
 
     setBotMsgs(prev => [...prev, { role: "user", text: userText, time: now }]);
 
-    if (isSeanceRequest(userText)) {
-      try {
-        const targetDate = parseSeanceDate(userText);
-        const isoDate = targetDate.toISOString().slice(0, 10);
-        const dayName = dayNamesFr[targetDate.getDay()];
-        let list = toSeanceList(await api.get(`/api/etudiant/seances?referenceDate=${isoDate}`));
-        if (!list.length && academicContext?.seances) {
-          list = toSeanceList(academicContext.seances);
-        }
-        const reply = formatSeances(list);
-        const replyTime = fmt(new Date().toISOString());
-        setBotMsgs(prev => [...prev, { role: "bot", text: reply, time: replyTime }]);
-      } catch {
-        const replyTime = fmt(new Date().toISOString());
-        const dayName = dayNamesFr[parseSeanceDate(userText).getDay()];
-        const cached = toSeanceList(academicContext?.seances);
-        const reply = formatSeances(cached);
-        setBotMsgs(prev => [...prev, { role: "bot", text: reply, time: replyTime }]);
-      } finally {
-        setBotLoading(false);
-      }
+    if (userText.toLowerCase().startsWith("/debug")) {
+      const day = getDayFromText(userText) || dayNamesFr[new Date().getDay()];
+      const list = toSeanceList(academicContext?.seances);
+      const filtered = filterSeancesByDay(list, day);
+      const lines = filtered.map(s => `${s.jourSemaine} ${s.heureDebut || ""}-${s.heureFin || ""} ${s.typeSeance || ""} ${s.matiereNom || ""} ${s.classeCode || ""}`.trim());
+      const reply = `DEBUG ${day}: ${filtered.length} seances\n${lines.join("\n")}`.trim();
+      const replyTime = fmt(new Date().toISOString());
+      setBotMsgs(prev => [...prev, { role: "bot", text: reply, time: replyTime }]);
+      setBotLoading(false);
       return;
     }
 
-    const reply = await getGroqResponse(userText, academicContext);
+    const reply = await getGroqResponse(userText, buildCompactContext());
     const replyTime = fmt(new Date().toISOString());
 
     setBotMsgs(prev => [...prev, { role: "bot", text: reply, time: replyTime }]);

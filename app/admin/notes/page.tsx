@@ -102,7 +102,7 @@ function toTypeForFormula(typeNote?: string): "DS" | "TP" | "EXAMEN" | null {
 }
 
 function computeMatiereMoyenne(ds: number | null, tp: number | null, examen: number | null): number {
-    return (examen ?? 0) * 0.7 + (ds ?? 0) * 0.15 + (tp ?? 0) * 0.15;
+    return (examen ?? 0) * 0.7 + (ds ?? 0) * 0.3;
 }
 
 export default function AdminNotesListPage() {
